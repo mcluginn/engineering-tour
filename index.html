@@ -959,6 +959,42 @@
                             isTyping = false;
                         }
                     }
+                    else if (isSimActive) {
+                        // Allow the mobile ACT button to press the mini-game Action buttons
+                        const simBtn = document.getElementById('btn-sim-start');
+                        if (simBtn && !simBtn.disabled && simBtn.style.display !== 'none') {
+                            simBtn.click();
+                        }
+                    }
+                    else {
+                        checkInteraction();
+                    }
+                }
+                return;
+            }
+                e.preventDefault(); 
+                
+                if (isQaActive || isGameFinished) return; 
+
+                if (!isEditMode) {
+                    if (isBattleActive) {
+                        advancePokemonBattle();
+                    }
+                    else if (isPosterActive) {
+                        closePoster();
+                    }
+                    else if (isDialogActive) {
+                        if (!isTyping && currentDialogPageIdx < currentDialogPages.length - 1) {
+                            currentDialogPageIdx++;
+                            playDialogPage();
+                        } else if (!isTyping) {
+                            closeDialog();
+                        } else {
+                            clearTimeout(typeWriterTimeout);
+                            dialogText.textContent = currentFullText;
+                            isTyping = false;
+                        }
+                    }
                     else if (!isSimActive) checkInteraction();
                 }
                 return;

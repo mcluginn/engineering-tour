@@ -299,9 +299,22 @@
             #dialog-portrait { max-width: 25vw !important; }
             #dialog-text-area { padding-right: 28vw !important; }
 
-            #lathe-canvas, #refrig-canvas, #gears-canvas, #battle-player-canvas, #poster-image-display {
-                width: 100% !important;
-                height: auto !important;
+           /* Fix Canvas Squashing on Mobile Webviews */
+            #poster-image-display { 
+                width: 100% !important; 
+                height: auto !important; 
+            }
+            #lathe-canvas { 
+                width: 100% !important; 
+                height: 120px !important; 
+            }
+            #refrig-canvas, #gears-canvas { 
+                width: 100% !important; 
+                height: 380px !important; 
+            }
+            #battle-player-canvas { 
+                width: 100% !important; 
+                height: 180px !important; 
             }
             /* Force exact proportions so mobile browsers do not squash the height */
             #lathe-canvas { aspect-ratio: 410 / 150 !important; }

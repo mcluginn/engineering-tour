@@ -261,12 +261,25 @@
 
         @media (max-width: 1024px) {
             body { padding-bottom: 200px; justify-content: flex-start; }
-            h1 { font-size: 20px; margin-top: 5px; }
+            h1 { font-size: 18px; margin-top: 5px; } /* Slightly smaller for mobile */
             .instructions { display: none; }
+            
+            /* HIDE DEV TOOLS ON MOBILE TO STOP IT FROM BLOCKING THE SCREEN */
+            #dev-tools { display: none !important; }
+            
+            /* SHRINK OBJECTIVES TRACKER ON MOBILE */
+            #objective-tracker {
+                font-size: 10px !important;
+                padding: 6px !important;
+                top: 5px !important;
+                left: 5px !important;
+                line-height: 1.2 !important;
+                background: rgba(0,0,0,0.6) !important;
+            }
             
             #game-container {
                 width: 100vw !important;
-                height: 65vw !important;
+                height: 85vw !important; /* Made the game map slightly taller for phones */
                 max-width: 1000px;
                 max-height: 650px;
                 border: none;
@@ -1802,6 +1815,9 @@
         function update() {
             if (isDialogActive || isEditMode || isSimActive || isBattleActive || isPosterActive || isQaActive || isGameFinished) return; 
 
+            // Boost player speed exclusively for mobile devices
+            player.speed = window.innerWidth <= 1024 ? 2.5 : 1;
+
             player.dx = 0; player.dy = 0; let isMoving = false;
             if (keys.ArrowLeft || keys.a) { player.dx = -player.speed; player.facing = 'left'; isMoving = true; }
             if (keys.ArrowRight || keys.d) { player.dx = player.speed; player.facing = 'right'; isMoving = true; }
@@ -1919,6 +1935,10 @@
                 keys[keyName] = true; 
             }, { passive: false });
             btn.addEventListener('touchend', (e) => { 
+                e.preventDefault(); 
+                keys[keyName] = false; 
+            }, { passive: false });
+            btn.addEventListener('touchcancel', (e) => { 
                 e.preventDefault(); 
                 keys[keyName] = false; 
             }, { passive: false });

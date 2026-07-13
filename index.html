@@ -52,8 +52,8 @@
             line-height: 1.5;
         }
 
-        #dev-tools { display: none !important; 
-        }
+        #dev-tools { display: none !important; }
+        
         .dev-btn { background: #e74c3c; color: white; border: 2px solid white; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-weight: bold; transition: all 0.2s; margin-bottom: 5px; width: 100%; }
         #btn-export, #btn-add-npc, #btn-add-machine, #btn-add-poster { display: none; }
         .dev-btn:hover { opacity: 0.8; }
@@ -101,7 +101,8 @@
         #simulation-modal {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 450px; background: #2c3e50; border: 4px solid #9b59b6; border-radius: 8px;
-            z-index: 50; padding: 20px; box-shadow: 0 0 30px rgba(0,0,0,0.8); text-align: center;
+            z-index: 150; padding: 20px; box-shadow: 0 0 30px rgba(0,0,0,0.8); text-align: center;
+            max-height: 80vh; overflow-y: auto; /* Allows scrolling on small screens */
         }
         #sim-screen { background: #000; color: #2ecc71; font-family: monospace; height: 180px; padding: 10px; text-align: left; overflow-y: auto; border: 2px solid #7f8c8d; margin-bottom: 15px; border-radius: 4px; white-space: pre-wrap; font-size: 14px; }
         
@@ -261,9 +262,6 @@
             body { padding-bottom: 200px; justify-content: flex-start; }
             h1 { font-size: 18px; margin-top: 5px; } /* Slightly smaller for mobile */
             .instructions { display: none; }
-            
-            /* HIDE DEV TOOLS ON MOBILE TO STOP IT FROM BLOCKING THE SCREEN */
-            #dev-tools { display: none !important; }
             
             /* SHRINK OBJECTIVES TRACKER ON MOBILE */
             #objective-tracker {
@@ -969,33 +967,6 @@
                     else {
                         checkInteraction();
                     }
-                }
-                return;
-            }
-                e.preventDefault(); 
-                
-                if (isQaActive || isGameFinished) return; 
-
-                if (!isEditMode) {
-                    if (isBattleActive) {
-                        advancePokemonBattle();
-                    }
-                    else if (isPosterActive) {
-                        closePoster();
-                    }
-                    else if (isDialogActive) {
-                        if (!isTyping && currentDialogPageIdx < currentDialogPages.length - 1) {
-                            currentDialogPageIdx++;
-                            playDialogPage();
-                        } else if (!isTyping) {
-                            closeDialog();
-                        } else {
-                            clearTimeout(typeWriterTimeout);
-                            dialogText.textContent = currentFullText;
-                            isTyping = false;
-                        }
-                    }
-                    else if (!isSimActive) checkInteraction();
                 }
                 return;
             }

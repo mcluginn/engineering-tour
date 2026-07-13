@@ -1,0 +1,2272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Engineering Orientation Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #2c3e50; color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            height: 100vh; overflow: hidden;
+            touch-action: none; /* Prevent scroll bouncing on mobile */
+        }
+
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #0b192c; 
+            z-index: 9999; display: flex; justify-content: center; align-items: flex-end;
+            padding-bottom: 10vh; cursor: pointer;
+        }
+        #start-video {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1;
+        }
+        .start-hint {
+            background: rgba(0,0,0,0.85); color: #f1c40f; padding: 15px 30px;
+            border-radius: 8px; font-family: monospace; font-size: 20px; font-weight: bold;
+            animation: pulse 1.5s infinite; border: 2px solid #f1c40f; cursor: pointer;
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.5);
+            z-index: 10;
+        }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+
+        h1 { margin-top: 10px; margin-bottom: 5px; font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .instructions { margin-bottom: 10px; font-size: 14px; color: #bdc3c7; }
+
+        #player-controls { margin-bottom: 10px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid #34495e; display: flex; align-items: center; justify-content: center; }
+        #player-controls select { background: #2c3e50; color: #2ecc71; border: 1px solid #2ecc71; border-radius: 4px; padding: 2px 5px; font-weight: bold; cursor: pointer; }
+
+        #game-container {
+            position: relative; width: 1000px; height: 650px; background-color: #000;
+            border: 4px solid #34495e; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); overflow: hidden; 
+        }
+        canvas { display: block; border-radius: 4px; cursor: default; outline: none; }
+
+        /* OBJECTIVE TRACKER */
+        #objective-tracker {
+            position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.85);
+            border: 2px solid #f1c40f; color: #fff; padding: 10px; border-radius: 5px;
+            font-family: monospace; font-size: 13px; z-index: 100; box-shadow: 0 0 10px rgba(241, 196, 15, 0.3);
+            line-height: 1.5;
+        }
+
+        #dev-tools {
+            position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.85); color: #2ecc71;
+            padding: 10px; border-radius: 5px; font-family: monospace; z-index: 20; text-align: right; border: 1px solid #2ecc71; width: 250px;
+        }
+        .dev-btn { background: #e74c3c; color: white; border: 2px solid white; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-weight: bold; transition: all 0.2s; margin-bottom: 5px; width: 100%; }
+        #btn-export, #btn-add-npc, #btn-add-machine, #btn-add-poster { display: none; }
+        .dev-btn:hover { opacity: 0.8; }
+        #dev-instructions { display: none; text-align: left; font-size: 11px; color: #ecf0f1; margin-top: 10px; border-top: 1px solid #555; padding-top: 10px; }
+        #dev-instructions ul { padding-left: 15px; margin: 5px 0; }
+
+        #prop-panel {
+            display: none; position: absolute; top: 290px; right: 10px; background: rgba(0,0,0,0.9);
+            color: white; padding: 10px; width: 250px; font-family: monospace; border: 1px solid #3498db;
+            border-radius: 5px; z-index: 20; box-sizing: border-box; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        #prop-panel input, #prop-panel textarea, #prop-panel select { background: #2c3e50; color: white; border: 1px solid #7f8c8d; border-radius: 3px; padding: 3px 5px; font-family: monospace; }
+        #prop-panel label { font-size: 12px; margin-bottom: 5px; display: inline-block; }
+
+        #dialog-box {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%;
+            background: rgba(0, 0, 0, 0.85); border: 3px solid #f39c12; border-radius: 10px; padding: 15px; box-sizing: border-box; display: none; z-index: 10;
+        }
+        #dialog-content-wrapper { display: flex; gap: 15px; align-items: flex-start; }
+        #dialog-portrait { position: absolute; bottom: 0; right: 20px; width: auto; max-width: 300px; max-height: 400px; border-radius: 0; border: none; object-fit: contain; display: none; background-color: transparent; z-index: 11; filter: drop-shadow( -5px 5px 10px rgba(0,0,0,0.8) ); }
+        #dialog-text-area { flex: 1; padding-right: 320px; }
+        #dialog-speaker { font-weight: bold; color: #f1c40f; margin-bottom: 5px; font-size: 18px; letter-spacing: 1px; }
+        #dialog-text { color: white; font-size: 16px; line-height: 1.4; white-space: pre-wrap; }
+
+        /* Q&A Modal for Engr. Seña */
+        #qa-modal {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #2c3e50; padding: 20px; border: 4px solid #f39c12; border-radius: 10px;
+            z-index: 300; text-align: center; width: 400px; box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        #qa-modal img { max-width: 100%; max-height: 250px; margin-bottom: 15px; border-radius: 5px; border: 2px solid #7f8c8d; }
+        #qa-modal input { width: 80%; padding: 10px; font-size: 16px; margin-bottom: 15px; border: none; border-radius: 4px; text-align: center; text-transform: uppercase; }
+        #qa-modal button { background: #f39c12; color: #fff; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #qa-modal button:hover { background: #e67e22; }
+
+        /* Poster Modal */
+        #poster-modal {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85); padding: 15px; border: 3px solid #3498db; border-radius: 10px;
+            z-index: 200; box-shadow: 0 0 30px rgba(0,0,0,0.8); text-align: center;
+        }
+        #poster-image-display { max-width: 800px; max-height: 500px; display: block; margin: 0 auto; border-radius: 4px; }
+
+        /* Simulation Modal Styles */
+        #simulation-modal {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 450px; background: #2c3e50; border: 4px solid #9b59b6; border-radius: 8px;
+            z-index: 50; padding: 20px; box-shadow: 0 0 30px rgba(0,0,0,0.8); text-align: center;
+        }
+        #sim-screen { background: #000; color: #2ecc71; font-family: monospace; height: 180px; padding: 10px; text-align: left; overflow-y: auto; border: 2px solid #7f8c8d; margin-bottom: 15px; border-radius: 4px; white-space: pre-wrap; font-size: 14px; }
+        
+        #machine-container { display: none; position: relative; margin-bottom: 15px; }
+        #lathe-canvas { border: 2px solid #7f8c8d; border-radius: 4px; background: #1a252f; cursor: crosshair; display: block; }
+        #lathe-result-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; border-radius: 4px; z-index: 10; }
+        #lathe-instruction { display: none; font-size: 13px; color: #bdc3c7; margin-top: -10px; margin-bottom: 15px; }
+        
+        /* CNC UI Styles */
+        #cnc-ui-container { display: none; margin-bottom: 15px; }
+        #cnc-cheat-sheet { font-size: 11px; color: #bdc3c7; text-align: left; margin-top: -10px; margin-bottom: 10px; background: #1a252f; padding: 8px; border-radius: 4px; border: 1px solid #7f8c8d; }
+        #cnc-code-input { width: 100%; height: 80px; background: #0b192c; color: #2ecc71; font-family: monospace; border: 2px solid #7f8c8d; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: none; font-weight: bold; }
+        #cnc-status { color: #f1c40f; font-family: monospace; font-size: 12px; margin-bottom: 5px; height: 15px; font-weight: bold;}
+
+        .sim-btn { background: #3498db; color: white; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; margin: 0 5px; }
+        .sim-btn:hover { background: #2980b9; }
+        .sim-btn:disabled { background: #7f8c8d; cursor: not-allowed; }
+
+        #export-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c3e50; padding: 20px; border-radius: 8px; border: 2px solid #3498db; z-index: 100; width: 80%; }
+        #export-modal textarea { width: 100%; height: 300px; background: #1a252f; color: #2ecc71; font-family: monospace; border: none; padding: 10px; margin-bottom: 10px; }
+        #close-export { background: #e74c3c; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; }
+
+        /* BARRICADE MODAL STYLES */
+        #barricade-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #0a0a0a; z-index: 20000; flex-direction: column; align-items: center; user-select: none;
+            touch-action: none; font-family: sans-serif;
+        }
+        #b_gameCanvas { display: block; touch-action: none; }
+        
+        .b-ui-box { position: absolute; left: 50%; transform: translateX(-50%); z-index: 10; transition: all 0.3s; opacity: 0; pointer-events: none; }
+        .b-card { padding: 10px 20px; border-radius: 50px; display: flex; flex-direction: column; align-items: center; gap: 5px; transition: all 0.3s; }
+        .b-card-red { background: rgba(239, 68, 68, 0.3); }
+        .b-card-red.active { background: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,0.4); transform: scale(1.1); }
+        .b-card-blue { background: rgba(59, 130, 246, 0.3); }
+        .b-card-blue.active { background: #3b82f6; box-shadow: 0 0 20px rgba(59,130,246,0.4); transform: scale(1.1); }
+        .b-walls-container { display: flex; gap: 4px; }
+        .b-wall-pip { width: 6px; height: 12px; border-radius: 2px; }
+        
+        #b-menu-screen, #b-gameover-screen {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 20; backdrop-filter: blur(5px);
+        }
+        
+        .b-btn {
+            padding: 15px 30px; border-radius: 30px; font-size: 18px; font-weight: 900; border: none;
+            cursor: pointer; transition: transform 0.1s; color: white; margin: 10px;
+        }
+        .b-btn:active { transform: scale(0.95); }
+        .b-btn-ai { background: linear-gradient(to right, #3b82f6, #ef4444); box-shadow: 0 0 20px rgba(59,130,246,0.5); }
+        .b-btn-human { background: white; color: black; box-shadow: 0 0 20px rgba(255,255,255,0.4); }
+        .b-btn-exit { background: #333; color: white; border: 1px solid #555; padding: 10px 20px; font-size: 14px; margin-top: 20px;}
+        
+        #b-error-toast {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(220, 38, 38, 0.9); color: white; padding: 10px 20px; border-radius: 8px;
+            font-weight: bold; pointer-events: none; z-index: 50; display: none;
+        }
+
+        /* POKEMON BATTLE STYLES */
+        #battle-scene {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000000; z-index: 10000; flex-direction: column; justify-content: flex-end;
+            animation: battle-flash 0.6s;
+        }
+        @keyframes battle-flash {
+            0% { background: #000; }
+            20% { background: #fff; }
+            40% { background: #000; }
+            60% { background: #fff; }
+            80% { background: #000; }
+            100% { background: #000000; }
+        }
+        @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes takeDamage { 0%, 100% { filter: none; transform: translateX(0); } 20%, 60% { filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5); transform: translateX(-10px); } 40%, 80% { filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5); transform: translateX(10px); } }
+        @keyframes faintAnim { to { transform: translateY(100%); opacity: 0; } }
+
+        #battle-enemy-container { position: absolute; top: 20px; right: 80px; }
+        #battle-player-container { position: absolute; bottom: 180px; left: 80px; }
+
+        #battle-dialog {
+            height: 150px; background: #fff; border: 6px solid #606060; border-radius: 10px; 
+            margin: 15px; padding: 20px; box-shadow: inset 0 0 0 4px #285068; display: flex; align-items: center;
+        }
+        #battle-text {
+            color: #202020; font-family: 'Courier New', monospace; font-size: 26px; 
+            font-weight: bold; margin: 0; line-height: 1.5; text-transform: uppercase;
+        }
+
+        /* FINISH SCREEN */
+        #finish-screen {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.9); z-index: 99999; flex-direction: column; justify-content: center; align-items: center; color: #f1c40f; font-family: monospace;
+        }
+        #finish-screen h1 { font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 20px #f1c40f; }
+        
+        /* =========================================
+           MOBILE OPTIMIZATION STYLES 
+           ========================================= */
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 10000;
+            pointer-events: none;
+        }
+        .mc-dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 5px;
+            pointer-events: auto;
+        }
+        .mc-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            touch-action: none;
+        }
+        .mc-btn:active { background: rgba(255, 255, 255, 0.5); }
+        .mc-up { grid-column: 2; grid-row: 1; }
+        .mc-left { grid-column: 1; grid-row: 2; }
+        .mc-right { grid-column: 3; grid-row: 2; }
+        .mc-down { grid-column: 2; grid-row: 3; }
+        
+        .mc-action {
+            width: 70px;
+            height: 70px;
+            border-radius: 35px;
+            background: rgba(243, 156, 18, 0.5);
+            border: 2px solid rgba(243, 156, 18, 0.8);
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            pointer-events: auto;
+            touch-action: none;
+        }
+        .mc-action:active { background: rgba(243, 156, 18, 0.8); }
+
+        @media (max-width: 1024px) {
+            body { padding-bottom: 200px; justify-content: flex-start; }
+            h1 { font-size: 20px; margin-top: 5px; }
+            .instructions { display: none; }
+            
+            #game-container {
+                width: 100vw !important;
+                height: 65vw !important;
+                max-width: 1000px;
+                max-height: 650px;
+                border: none;
+                border-radius: 0;
+            }
+            canvas#gameCanvas { width: 100%; height: 100%; }
+            #mobile-controls { display: flex; }
+            
+            /* Responsive Modals */
+            #simulation-modal, #qa-modal, #poster-modal, #export-modal {
+                width: 95vw !important;
+                max-width: 450px !important;
+                padding: 10px;
+            }
+            #dialog-box { width: 95vw; left: 50%; transform: translateX(-50%); padding: 10px; }
+            #dialog-portrait { max-width: 25vw !important; }
+            #dialog-text-area { padding-right: 28vw !important; }
+
+            #lathe-canvas, #refrig-canvas, #gears-canvas, #battle-player-canvas, #poster-image-display {
+                width: 100% !important;
+                height: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bgm" src="videoplayback_2.m4a" loop autoplay></audio>
+    <audio id="sfx-walk" src="walk.m4A"></audio>
+    <audio id="sfx-machine" src="machine.m4a" loop></audio>
+
+    <div id="start-screen">
+        <video id="start-video" src="b.mp4" autoplay loop muted playsinline></video>
+        <div class="start-hint">CLICK TO START</div>
+    </div>
+
+    <h1>Engineering Department Tour</h1>
+    <div id="player-controls">
+        <span style="margin-right: 10px;">Choose your character:</span>
+        <select id="main-player-gender">
+            <option value="male">Male Student</option>
+            <option value="female">Female Student</option>
+        </select>
+        <button id="btn-mute" style="margin-left:15px; background:#2c3e50; color:#f1c40f; border:1px solid #f1c40f; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; transition: 0.2s;">🔊 Music ON</button>
+    </div>
+    <p class="instructions">Use Arrow Keys or WASD to move. Press SPACEBAR near a person, machine, or poster to interact.</p>
+
+    <div id="game-container">
+        
+        <div id="objective-tracker"></div>
+        
+        <canvas id="gameCanvas" width="1000" height="650" tabindex="0"></canvas>
+        
+        <div id="dev-tools">
+            <div style="margin-bottom: 5px; font-size: 14px;">Cursor XY: <span id="mouse-x" style="color:white;">0</span>, <span id="mouse-y" style="color:white;">0</span></div>
+            <button id="btn-debug" class="dev-btn">Option</button>
+            <button id="btn-add-npc" class="dev-btn">➕ ADD NEW NPC</button>
+            <button id="btn-add-machine" class="dev-btn">⚙️ ADD MACHINE</button>
+            <button id="btn-add-poster" class="dev-btn">🖼️ ADD POSTER</button>
+            <button id="btn-export" class="dev-btn">💾 EXPORT MAP DATA</button>
+            <div id="dev-instructions">
+                <strong>EDITOR MODE ACTIVE</strong>
+                <ul>
+                    <li><b>Draw Wall:</b> Click & Drag empty space.</li>
+                    <li><b>Edit Object:</b> CLICK ON AN NPC, Machine, Poster, or Wall to edit.</li>
+                    <li><b>Delete Object:</b> Select it (yellow), press <code>DEL</code>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="simulation-modal">
+            <h2 id="sim-title" style="margin-top:0; color:#9b59b6;">Machine Interface</h2>
+            <div id="sim-screen">System Ready. Awaiting start command...</div>
+            
+            <div id="machine-container">
+                <canvas id="lathe-canvas" width="410" height="150"></canvas>
+                <div id="lathe-result-overlay">
+                    <h3 id="lathe-accuracy-text" style="margin:0; font-size:22px;"></h3>
+                    <p id="lathe-feedback-text" style="margin:5px 0 0 0; font-size:14px; color:#bdc3c7;"></p>
+                </div>
+            </div>
+            
+            <div id="refrig-container" style="display: none; margin-bottom: 15px;">
+                <canvas id="refrig-canvas" width="410" height="460" style="background:#0b192c; border:2px solid #7f8c8d; border-radius:4px; display:block; margin: 0 auto;"></canvas>
+            </div>
+
+            <div id="gears-container" style="display: none; margin-bottom: 15px;">
+                <canvas id="gears-canvas" width="410" height="460" style="background:#deb887; border:2px solid #8b4513; border-radius:4px; display:block; margin: 0 auto; box-shadow: inset 0 0 50px rgba(139, 69, 19, 0.5); cursor: grab;"></canvas>
+                <p id="gears-status" style="color: #f1c40f; text-align: center; font-weight: bold; margin-top: 10px; font-size: 14px;">Connect the Red gear to the Green gear! (Goal: CCW spin)</p>
+            </div>
+            
+            <p id="lathe-instruction">Click and drag up/down to carve a chess pawn into the rotating 3D block! Match the wireframe guide.</p>
+
+            <div id="cnc-ui-container">
+                <div id="cnc-cheat-sheet">
+                    <b>TARGET: Metal Pawn</b><br>
+                    <span style="color:#2ecc71;"><code>M03</code></span> : Spindle ON &nbsp;&nbsp;|&nbsp;&nbsp; <span style="color:#e74c3c;"><code>M05</code></span> : Spindle OFF<br>
+                    <span style="color:#3498db;"><code>G01 X[rad] Z[len]</code></span> : Cut into metal block<br>
+                    <b>GUIDE TO MAKE THE PAWN:</b><br>
+                    <code>M03</code> (Start) &rarr; <code>G01 X45 Z10</code> (Base) &rarr; <code>G01 X20 Z25</code> (Stem) &rarr; <code>G01 X35 Z40</code> (Head)
+                </div>
+                <div id="cnc-status">Ready for M/G-Code input.</div>
+                <textarea id="cnc-code-input" spellcheck="false" placeholder="M03&#10;G01 X45 Z10&#10;G01 X20 Z25&#10;G01 X35 Z40"></textarea>
+            </div>
+
+            <button id="btn-sim-start" class="sim-btn">START OPERATION</button>
+            <button id="btn-sim-close" class="sim-btn" style="background:#e74c3c;">DISCONNECT</button>
+        </div>
+
+        <div id="export-modal">
+            <h3 style="margin-top:0;">Map Data Generated!</h3>
+            <textarea id="export-text"></textarea><br>
+            <button id="close-export">Close</button>
+        </div>
+
+        <div id="prop-panel">
+            <h3 id="prop-title" style="margin:0 0 10px 0; color:#3498db; font-size:14px;">Edit Object</h3>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <label>X: <input type="number" id="prop-x" style="width:60px"></label>
+                <label>Y: <input type="number" id="prop-y" style="width:60px"></label>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <label>W: <input type="number" id="prop-w" style="width:60px"></label>
+                <label>H: <input type="number" id="prop-h" style="width:60px"></label>
+            </div>
+            
+            <div id="prop-npc-fields" style="display:none; margin-top:5px; border-top:1px solid #555; padding-top:10px;">
+                <label style="width:100%">Name:<br><input type="text" id="prop-name" style="width:100%; box-sizing:border-box; margin-top:2px;"></label><br>
+                <label style="width:100%; margin-top:5px;">Dialog:<br><textarea id="prop-dialog" style="width:100%; box-sizing:border-box; height:50px; margin-top:2px;"></textarea></label><br>
+                <label style="width:100%; margin-top:5px;">Image URL (optional):<br><input type="text" id="prop-image" style="width:100%; box-sizing:border-box; margin-top:2px;" placeholder="e.g. prof.jpg"></label><br>
+                <label style="margin-top:5px; display:inline-block; width:48%;">Color: <input type="color" id="prop-color"></label>
+                <label style="margin-top:5px; display:inline-block; width:48%; float:right;">Gender: 
+                    <select id="prop-gender" style="background:#2c3e50; color:white; border:1px solid #7f8c8d; border-radius:3px; padding:1px; width:100%;">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                    </select>
+                </label>
+            </div>
+
+            <div id="prop-machine-fields" style="display:none; margin-top:5px; border-top:1px solid #555; padding-top:10px;">
+                <label style="width:100%">Machine Name:<br><input type="text" id="prop-mach-name" style="width:100%; box-sizing:border-box; margin-top:2px;"></label><br>
+                <label style="width:100%; margin-top:5px;">Machine Type:<br>
+                    <select id="prop-mach-type" style="width:100%; box-sizing:border-box; margin-top:2px;">
+                        <option value="cnc">CNC Milling Machine</option>
+                        <option value="lathe">Lathe Machine</option>
+                        <option value="boiler">Boiler / Steam</option>
+                        <option value="refrigeration">Refrigeration System</option>
+                        <option value="gears">Gear Logic Puzzle</option>
+                    </select>
+                </label>
+            </div>
+
+            <div id="prop-poster-fields" style="display:none; margin-top:5px; border-top:1px solid #555; padding-top:10px;">
+                <label style="width:100%">Poster Image URL:<br><input type="text" id="prop-poster-url" style="width:100%; box-sizing:border-box; margin-top:2px;" placeholder="poster.png"></label>
+            </div>
+        </div>
+
+        <div id="poster-modal">
+            <img id="poster-image-display" src="" alt="Poster">
+            <div style="color: #bdc3c7; font-size: 12px; margin-top: 10px; font-family: monospace;">Press SPACE to close</div>
+        </div>
+
+        <div id="dialog-box">
+            <img id="dialog-portrait" src="" alt="NPC Portrait">
+            <div id="dialog-content-wrapper">
+                <div id="dialog-text-area">
+                    <div id="dialog-speaker">Professor Name</div>
+                    <div id="dialog-text">Hello! Welcome to the lab.</div>
+                </div>
+            </div>
+            <div id="dialog-instruction" style="position: absolute; bottom: 5px; right: 15px; font-size: 12px; color: #7f8c8d;">Press SPACE to close</div>
+        </div>
+
+        <div id="qa-modal">
+            <h3 style="color: #f1c40f; margin-top: 0;">Answer the Question</h3>
+            <img id="qa-poster" src="p4.jpg" alt="Seña's Poster">
+            
+            <div id="qa-hint" style="color: #3498db; font-size: 14px; cursor: pointer; text-decoration: underline; margin-bottom: 10px;">Hint</div>
+            <p id="qa-hint-text" style="display: none; color: white; font-size: 14px; margin-bottom: 10px;">The acronym of this University _ _ _ _ _</p>
+            
+            <input type="text" id="qa-input" placeholder="Type answer here..." autocomplete="off">
+            <br>
+            <button id="qa-submit">SUBMIT</button>
+        </div>
+
+        <div id="battle-scene">
+            <div id="battle-enemy-container">
+                <video id="battle-video" src="a.mp4" preload="auto" style="display: block; height: 400px; filter: drop-shadow(-5px 5px 0px rgba(0,0,0,0.3));"></video>
+            </div>
+            <div id="battle-player-container">
+                <canvas id="battle-player-canvas" width="150" height="200"></canvas>
+            </div>
+            <div id="battle-dialog">
+                <p id="battle-text"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Controls Array -->
+    <div id="mobile-controls">
+        <div class="mc-dpad">
+            <div class="mc-btn mc-up" id="btn-up">↑</div>
+            <div class="mc-btn mc-left" id="btn-left">←</div>
+            <div class="mc-btn mc-right" id="btn-right">→</div>
+            <div class="mc-btn mc-down" id="btn-down">↓</div>
+        </div>
+        <div class="mc-action" id="btn-space">ACT</div>
+    </div>
+
+    <div id="finish-screen">
+        <h1>TOUR COMPLETE!</h1>
+        <p>You have successfully completed all objectives and defeated the final boss.</p>
+        <button onclick="location.reload()" style="padding: 10px 20px; font-size: 18px; cursor: pointer; background: #2ecc71; border: none; color: white; font-weight: bold; border-radius: 5px; margin-top: 20px;">Play Again</button>
+    </div>
+
+    <div id="barricade-modal">
+        <div id="b-p2-ui" class="b-ui-box" style="top: 1rem;">
+            <div id="b-p2-card" class="b-card b-card-red">
+                <span style="color: white; font-weight: bold; font-size: 14px;">RED (DMD)</span>
+                <div id="b-p2-walls-container" class="b-walls-container"></div>
+            </div>
+        </div>
+
+        <canvas id="b_gameCanvas"></canvas>
+
+        <div id="b-p1-ui" class="b-ui-box" style="bottom: 1.5rem;">
+            <div id="b-p1-card" class="b-card b-card-blue">
+                <div id="b-p1-walls-container" class="b-walls-container"></div>
+                <span style="color: white; font-weight: bold; font-size: 14px;">BLUE (YOU)</span>
+            </div>
+        </div>
+
+        <div id="b-error-toast"></div>
+
+        <div id="b-menu-screen">
+            <h1 style="font-size: 3rem; font-weight: 900; color: white; margin-bottom: 0.5rem; letter-spacing: 0.1em;">BARRICADE</h1>
+            <h2 style="font-size: 1.25rem; font-weight: bold; color: #fbbf24; margin-bottom: 2rem; letter-spacing: 0.1em;">STRATEGY</h2>
+            
+            <div style="color: #d1d5db; max-width: 350px; text-align: center; margin-bottom: 2rem; background: #1e1e1e; padding: 1.5rem; border-radius: 12px; border: 1px solid #333; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                <p style="margin: 0 0 10px 0;"><span style="color: #3b82f6; font-weight: bold;">Blue</span> aims for the top row.</p>
+                <p style="margin: 0 0 15px 0;"><span style="color: #ef4444; font-weight: bold;">Red</span> aims for the bottom row.</p>
+                <hr style="border-color: #4b5563; margin-bottom: 15px;"/>
+                <p style="font-size: 14px; margin: 0 0 10px 0;">On your turn: Click an adjacent square to move, OR click between squares to place a wall.</p>
+                <p style="font-size: 12px; font-style: italic; color: #9ca3af; margin: 0;">(Right-click on desktop to rotate walls while hovering)</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button onclick="BarricadeEngine.initGame(false)" class="b-btn b-btn-human">PVP</button>
+                <button onclick="BarricadeEngine.initGame(true)" class="b-btn b-btn-ai">PLAY VS DMD</button>
+                <button onclick="BarricadeEngine.close()" class="b-btn-exit">EXIT BARRICADE</button>
+            </div>
+        </div>
+
+        <div id="b-gameover-screen" style="display: none; cursor: pointer;" onclick="BarricadeEngine.returnToMenu()">
+            <div id="b-gameover-card" style="padding: 2rem; border-radius: 1rem; display: flex; flex-direction: column; align-items: center; box-shadow: 0 0 50px rgba(0,0,0,0.5);">
+                <h2 id="b-winner-text" style="font-size: 3rem; font-weight: 900; margin-bottom: 1rem; letter-spacing: 0.05em; text-transform: uppercase;"></h2>
+                <p style="color: rgba(255,255,255,0.8); font-weight: 500; background: rgba(0,0,0,0.5); padding: 0.5rem 1rem; border-radius: 50px;">Tap to return to menu</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const MAP_WIDTH = 1000;
+        const MAP_HEIGHT = 650;
+
+        // Load Map Image
+        const mapImage = new Image();
+        mapImage.src = 'map.jpg'; 
+        let imageLoaded = false;
+        mapImage.onload = () => { imageLoaded = true; };
+
+        const dialogBox = document.getElementById('dialog-box');
+        const dialogSpeaker = document.getElementById('dialog-speaker');
+        const dialogText = document.getElementById('dialog-text');
+        
+        let isDialogActive = false;
+        let isSimActive = false;
+        let isBattleActive = false;
+        let isPosterActive = false;
+        let isQaActive = false;
+        let isGameFinished = false;
+        let typeWriterTimeout;
+        let simInterval;
+        let currentDialogPages = [];
+        let currentDialogPageIdx = 0;
+        let currentFullText = "";
+        let isTyping = false;
+        let senaCleared = false;
+        
+        // Comprehensive Objectives tracking Sets
+        let visitedNPCs = new Set();
+        let visitedPosters = new Set();
+        let completedMachines = new Set();
+        let activeMachine = null; 
+
+        // POKEMON BATTLE LOGIC
+        let battleStep = 0;
+        const battleSequence = [
+            `Wild ENGR. DELA CRUZ appeared!`,
+            `ENGR. DELA CRUZ used BRAZILIAN DANCE!`,
+            `It's super effective!`,
+            `Player fainted...`
+        ];
+
+        function drawPlayerBack() {
+            const pCtx = document.getElementById('battle-player-canvas').getContext('2d');
+            pCtx.clearRect(0, 0, 150, 200);
+            pCtx.save();
+            pCtx.scale(5, 5);
+            drawCharacter(pCtx, 5, 5, 20, 30, player.color, 'up', player.gender, true, 0);
+            pCtx.restore();
+        }
+
+        function startPokemonBattle(npc) {
+            isBattleActive = true; 
+            const battleScene = document.getElementById('battle-scene');
+            const battleText = document.getElementById('battle-text');
+            const battleVideo = document.getElementById('battle-video');
+            
+            battleVideo.style.display = 'block';
+            battleVideo.currentTime = 0; 
+            battleVideo.pause();
+
+            battleScene.style.display = 'flex';
+            battleStep = 0;
+            battleText.textContent = battleSequence[battleStep] + " ▼";
+
+            document.getElementById('battle-enemy-container').style.animation = 'none';
+            void document.getElementById('battle-enemy-container').offsetWidth;
+            document.getElementById('battle-enemy-container').style.animation = 'slideInRight 1s ease-out';
+
+            document.getElementById('battle-player-container').style.animation = 'none';
+            void document.getElementById('battle-player-container').offsetWidth;
+            document.getElementById('battle-player-container').style.animation = 'slideInLeft 1s ease-out';
+            
+            document.getElementById('battle-player-canvas').style.animation = '';
+            drawPlayerBack();
+        }
+
+        function advancePokemonBattle() {
+            battleStep++;
+            const battleVideo = document.getElementById('battle-video');
+            const playerCanvas = document.getElementById('battle-player-canvas');
+
+            if (battleStep === 1) {
+                bgm.pause();
+                battleVideo.play();
+            } else if (battleStep === 2) {
+                battleVideo.pause();
+                if (!btnMute.textContent.includes('Muted')) { attemptPlayBGM(); }
+                playerCanvas.style.animation = "none";
+                void playerCanvas.offsetWidth; 
+                playerCanvas.style.animation = "takeDamage 0.5s";
+            } else if (battleStep === 3) {
+                playerCanvas.style.animation = "none";
+                void playerCanvas.offsetWidth; 
+                playerCanvas.style.animation = "faintAnim 1s forwards";
+            }
+
+            if (battleStep < battleSequence.length) {
+                let suffix = (battleStep < battleSequence.length - 1) ? " ▼" : "";
+                document.getElementById('battle-text').textContent = battleSequence[battleStep] + suffix;
+            } else {
+                document.getElementById('battle-scene').style.display = 'none';
+                isBattleActive = false;
+                player.x = 100; player.y = 350;
+            }
+        }
+
+        const bgm = document.getElementById('bgm');
+        bgm.volume = 0.5;
+        const sfxWalk = document.getElementById('sfx-walk');
+        sfxWalk.volume = 0.6;
+        const sfxMachine = document.getElementById('sfx-machine');
+        sfxMachine.volume = 0.5;
+
+        const btnMute = document.getElementById('btn-mute');
+        let bgmStarted = false;
+        let lastStepTime = 0;
+        
+        function attemptPlayBGM() {
+            if (!bgmStarted || bgm.paused) {
+                let playPromise = bgm.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => { bgmStarted = true; }).catch(error => {});
+                }
+            }
+        }
+
+        function playFootstep() { sfxWalk.currentTime = 0; sfxWalk.play().catch(e => {}); }
+        function startMachineSound() { sfxMachine.currentTime = 0; sfxMachine.play().catch(e => {}); }
+        function stopMachineSound() { sfxMachine.pause(); }
+
+        document.getElementById('start-screen').addEventListener('click', () => {
+            document.getElementById('start-screen').style.display = 'none';
+            let sv = document.getElementById('start-video');
+            if (sv) sv.pause();
+            attemptPlayBGM(); canvas.focus();
+        });
+
+        document.getElementById('main-player-gender').addEventListener('change', (e) => {
+            player.gender = e.target.value;
+            player.color = player.gender === 'female' ? '#e74c3c' : '#3498db';
+            e.target.blur(); canvas.focus();
+        });
+
+        btnMute.addEventListener('click', () => {
+            attemptPlayBGM(); bgm.muted = !bgm.muted; sfxWalk.muted = bgm.muted; sfxMachine.muted = bgm.muted;
+            btnMute.textContent = bgm.muted ? '🔇 Muted' : '🔊 Music ON';
+            btnMute.style.color = bgm.muted ? '#e74c3c' : '#f1c40f'; btnMute.style.borderColor = bgm.muted ? '#e74c3c' : '#f1c40f';
+            btnMute.blur(); canvas.focus();
+        });
+
+        const player = { x: 100, y: 350, w: 20, h: 30, speed: 1, dx: 0, dy: 0, color: '#3498db', facing: 'down', gender: 'male', walkFrame: 0, walkTimer: 0 };
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, s: false, a: false, d: false };
+
+        let boundaries = [
+            {x: 0, y: 0, w: 1000, h: 20},{x: 6, y: 609, w: 1000, h: 20},{x: 0, y: 0, w: 20, h: 650},{x: 980, y: 0, w: 20, h: 650},
+            {x: 194, y: 22, w: 42, h: 270},{x: 86, y: 9, w: 9, h: 290},{x: 126, y: 294, w: 112, h: 6},{x: 268, y: 294, w: 187, h: 8},
+            {x: 503, y: 21, w: 8, h: 273},{x: 466, y: 145, w: 24, h: 66},{x: 281, y: 200, w: 149, h: 80},{x: 482, y: 292, w: 42, h: 10},
+            {x: 550, y: 294, w: 176, h: 10},{x: 21, y: 350, w: 25, h: 8},{x: 250, y: 357, w: 9, h: 264},{x: 470, y: 472, w: 17, h: 56},
+            {x: 361, y: 436, w: 91, h: 136},{x: 556, y: 435, w: 122, h: 131},{x: 721, y: 458, w: 24, h: 61},{x: 501, y: 360, w: 9, h: 250},
+            {x: 244, y: 348, w: 46, h: 10},{x: 318, y: 348, w: 139, h: 10},{x: 486, y: 348, w: 42, h: 10},{x: 557, y: 347, w: 165, h: 11},
+            {x: 750, y: 351, w: 24, h: 8},{x: 763, y: 361, w: 9, h: 246},{x: 76, y: 437, w: 108, h: 141},{x: 34, y: 516, w: 29, h: 58},
+            {x: 816, y: 366, w: 62, h: 166},{x: 911, y: 375, w: 63, h: 157},{x: 876, y: 565, w: 52, h: 22},{x: 798, y: 574, w: 13, h: 37},
+            {x: 124, y: 348, w: 97, h: 9},{x: 76, y: 347, w: 21, h: 14},{x: 96, y: 344, w: 26, h: 6},{x: 730, y: 138, w: 20, h: 59},
+            {x: 520, y: 21, w: 234, h: 73},{x: 566, y: 256, w: 143, h: 28},{x: 569, y: 162, w: 131, h: 27},{x: 798, y: 40, w: 15, h: 170},
+            {x: 818, y: 42, w: 155, h: 13},{x: 800, y: 300, w: 8, h: 238},{x: 800, y: 240, w: 176, h: 21},{x: 819, y: 303, w: 59, h: 57},
+            {x: 117, y: 210, w: 68, h: 28},{x: 118, y: 31, w: 72, h: 69},{x: 283, y: 37, w: 49, h: 42},{x: 764, y: 20, w: 10, h: 282},
+            {x: 755, y: 292, w: 8, h: 9},{x: 260, y: 464, w: 29, h: 7},{x: 321, y: 465, w: 16, h: 7},{x: 330, y: 475, w: 9, h: 129}
+        ];
+
+        let npcs = [
+            { id: 'prof_me', x: 468, y: 218, w: 24, h: 32, color: '#000000', name: 'Engr. Seña', dialog: 'Welcome to the Mechanical Engineering Lab!', gender: 'male', image: 'b.png' },
+            { id: 'prof_shop', x: 708, y: 157, w: 24, h: 32, color: '#e67e22', name: 'Engr. Amparo', dialog: `This is Our GENERAL LABORATORY SAFETY RULES:\n- Know and follow safety rules and protocols before starting an experiment.\n- Familiarize yourself with all safety equipment and evacuation routes.\n- Do not operate a machine unless you are familiar with it.\n- Ask for assistance from your instructor before using an equipment.|- Check equipment/machine set-up before performing the experiment.\n- Do not engage in horseplay when performing an experiment.\n- Wear appropriate clothing (no open-toed shoes and no loose clothing).\n- Wear eye protection when using toxic chemicals or mechanical equipment.|- Handle instruments carefully to prevent damage.\n- You must not work alone when using power tools or hazardous equipment.\n- Avoid distracting another worker while they are performing a task.\n- Determine potential hazards before beginning new operations.\n- Never make adjustments to a machine when it is in operation.|- Do not alter live circuits with bare hands. Turn main switch off first.\n- Practice good housekeeping. Exits should be unobstructed.\n- Do not eat, drink, chew gum, or apply cosmetics in the laboratories.\n- Report any untoward incident or accident immediately.`, gender: 'female', image: 'e.png' },
+            { id: 'prof_ee', x: 464, y: 423, w: 24, h: 32, color: '#9b59b6', name: 'Engr. Perez', dialog: 'Check the voltage on that breadboard.', gender: 'female', image: '' },
+            { id: 'prof_ece', x: 40, y: 473, w: 24, h: 32, color: '#1abc9c', name: 'Engr. Pioquinto', dialog: 'Welcome to EE.', gender: 'male', image: '' },
+            { id: 'prof_ee', x: 140, y: 473, w: 24, h: 32, color: '#1abc9c', name: 'Engr. Onofre', dialog: 'Welcome to EE.', gender: 'male', image: '' },
+            { id: 'prof_ie', x: 718, y: 413, w: 24, h: 32, color: '#e84393', name: 'Dr. Mollejon', dialog: 'Efficiency is key in Industrial Engineering.', gender: 'female', image: '' },
+            { id: 'prof_ce', x: 841, y: 562, w: 24, h: 32, color: '#3498db', name: 'Engr. Tagabuan', dialog: 'Civil Engineering: Building the future.', gender: 'female', image: '' },
+            { id: 'prof_ce', x: 871, y: 562, w: 24, h: 32, color: '#3498db', name: 'Engr. Javier', dialog: 'Civil Engineering: Building the future.', gender: 'male', image: '' },
+            { id: 'prof_ce', x: 911, y: 562, w: 24, h: 32, color: '#3498db', name: 'Engr. Antazo', dialog: 'Civil Engineering: Building the future.', gender: 'male', image: '' },
+            { id: 'npc_1783162184154', x: 474, y: 82, w: 24, h: 32, color: '#004fa3', name: 'Edmel John "EJ" Opinio - Business Manager', dialog: 'Dream big, stay humble.', gender: 'male', image: '7.png' },
+            { id: 'npc_1783162186940', x: 449, y: 82, w: 24, h: 32, color: '#004fa3', name: 'Gabbielle Nero - P.R.O', dialog: 'You are designed for a purpose, and with a purpose!', gender: 'female', image: '6.png' },
+            { id: 'npc_1783162187381', x: 421, y: 82, w: 24, h: 32, color: '#004fa3', name: 'Gabrielle Lance Estrellado - Auditor', dialog: 'Figure out the next step, not the whole trip.', gender: 'male', image: '5.png' },
+            { id: 'npc_1783162187787', x: 392, y: 82, w: 24, h: 32, color: '#004fa3', name: 'Vanna Jenille Alvarez - Treasurer', dialog: 'Carpe diem', gender: 'female', image: '4.png' },
+            { id: 'npc_1783162188242', x: 366, y: 82, w: 24, h: 32, color: '#004fa3', name: 'Ryu Emanuel Argañosa - Secretary', dialog: 'Freedom is nothing but a shackle to cling onto hope.', gender: 'male', image: '3.png' },
+            { id: 'npc_1783162188678', x: 336, y: 82, w: 24, h: 32, color: '#004fa3', name: 'DMD - Vice President', dialog: 'Sometimes you win, Sometimes you learn|Tara roblox?', gender: 'male', image: '2.png' },
+            { id: 'npc_1783162378971', x: 307, y: 82, w: 24, h: 32, color: '#004fa3', name: 'Ephraim Rick Bengco - President', dialog: 'Kung tres lang ang kailangan para pumasa, aanhin ko ang sobra', gender: 'male', image: '1.png' },
+            { id: 'npc_1783163757811', x: 345, y: 198, w: 24, h: 32, color: '#004fa3', name: 'Prince Andel Merabe - 3rd Year Rep', dialog: 'Alam mo ang labor day ay May 1? May 1 Thousand pesos ka ba dyan?', gender: 'male', image: '9.png' },
+            { id: 'npc_1783164150545', x: 302, y: 198, w: 24, h: 32, color: '#004fa3', name: 'James Immanuel De Torres - 4th Year Rep', dialog: 'Coffee ang fuel, deadlines and engine.', gender: 'male', image: '8.png' },
+            { id: 'npc_1783164526177', x: 388, y: 198, w: 24, h: 32, color: '#004fa3', name: 'John Lenrick Prado - 2nd Year Rep', dialog: 'Failure is not the opposite of success; it is a stepping stone towards it.', gender: 'male', image: '10.png' },
+            { id: 'npc_1783165195687', x: 239, y: 63, w: 24, h: 32, color: '#0f0f1b', name: 'Engr. De Guia', dialog: `Ito ang Pertual Hymn natin, ME kid\nPerpetual Help thy fount of truth\nWhere knowledge emanates\nWhere we have learned life will bear fruit\nFor us success awaits.|Thy children hear we sing for thee,\nWe raise our voices clear\nWe’ll shout and cheer in unity\nFor Alma Mater dear|Training the mind and the heart and the hand,\nReady to serve as best as we can\nPerpetual Help by thy banner we stand\nLoyal and true spread thy fame\nO’er the land.`, gender: 'male', image: 'c.png' },
+            { id: 'npc_1783165830943', x: 236, y: 128, w: 24, h: 32, color: '#bd9d80', name: 'Engr. Dela Cruz', dialog: `Mga Legends lang may alam nito, ME kid\nThe Eight (8) Perpetualite Core Values:\nI. Love of God, Love of Self, Family and Neighbor\nII. Love of Country and Good Governance\nIII. Academic and Professional Excellence\nIV. Health and Ecological Consciousness\nV. Peace and Global Solidarity\nVI. Filipino Christian Leadership\nVII. Value of Catholic Doctrine\nVIII. UPHSD and the Perpetualite`, gender: 'male', image: 'a.png' },
+            { id: 'npc_1783165851853', x: 551, y: 94, w: 24, h: 32, color: '#6284bc', name: 'Engr. Hermano', dialog: `This is Our GENERAL LABORATORY SAFETY RULES:\n- Know and follow safety rules and protocols before starting an experiment.\n- Familiarize yourself with all safety equipment and evacuation routes.\n- Do not operate a machine unless you are familiar with it.\n- Ask for assistance from your instructor before using an equipment.|- Check equipment/machine set-up before performing the experiment.\n- Do not engage in horseplay when performing an experiment.\n- Wear appropriate clothing (no open-toed shoes and no loose clothing).\n- Wear eye protection when using toxic chemicals or mechanical equipment.|- Handle instruments carefully to prevent damage.\n- You must not work alone when using power tools or hazardous equipment.\n- Avoid distracting another worker while they are performing a task.\n- Determine potential hazards before beginning new operations.\n- Never make adjustments to a machine when it is in operation.|- Do not alter live circuits with bare hands. Turn main switch off first.\n- Practice good housekeeping. Exits should be unobstructed.\n- Do not eat, drink, chew gum, or apply cosmetics in the laboratories.\n- Report any untoward incident or accident immediately.`, gender: 'male', image: 'd.png' },
+            { id: 'npc_1783166026436', x: 131, y: 247, w: 24, h: 32, color: '#008f6b', name: 'Sir. Jimuel', dialog: 'Hello!', gender: 'male', image: 'g.png' },
+            { id: 'npc_1783166033810', x: 305, y: 550, w: 24, h: 32, color: '#76c18c', name: 'Sir. Raymond', dialog: 'Hello!', gender: 'male', image: 'h.png' },
+            { id: 'npc_1783862583965', x: 285, y: 163, w: 24, h: 32, color: '#000000', name: 'Engr. Herbosa', dialog: 'Hello!', gender: 'male', image: 'f.png' },
+            { id: 'npc_1783862710414', x: 62, y: 218, w: 24, h: 32, color: '#114b01', name: 'Engr. Albaño', dialog: 'Hello!', gender: 'male', image: 'i.png' },
+            { id: 'npc_1783862710414', x: 62, y: 248, w: 24, h: 32, color: '#114b01', name: 'Engr. Manalang', dialog: 'Hello!', gender: 'female', image: '' },
+            { id: 'npc_1783862716903', x: 319, y: 426, w: 24, h: 32, color: '#ffffff', name: 'Engr. Alon', dialog: 'Hello!', gender: 'female', image: '' },
+            { id: 'npc_1783862724230', x: 22, y: 310, w: 24, h: 32, color: '#000000', name: 'Dr. Alviar (Dean)', dialog: 'Hello!', gender: 'female', image: 'j.png' }
+        ];
+
+        let machines = [
+            { id: 'mach_1', x: 520, y: 20, w: 60, h: 73, name: 'Main CNC Controller', type: 'cnc' },
+            { id: 'mach_2', x: 260, y: 40, w: 90, h: 20, name: 'Industrial Boiler', type: 'boiler' },
+            { id: 'mach_4', x: 157, y: 212, w: 80, h: 20, name: 'Refrigeration System', type: 'refrigeration' },
+            { id: 'mach_3', x: 565, y: 250, w: 145, h: 40, name: 'Wood Lathe Row', type: 'lathe' },
+            { id: 'mach_5', x: 568, y: 156, w: 80, h: 40, name: 'Gear Logic Puzzle', type: 'gears' }
+        ];
+
+        let posters = [
+            { id: 'poster_1783794607298', x: 765, y: 553, w: 10, h: 40, url: 'p2.jpg' },
+            { id: 'poster_1783794645618', x: 798, y: 403, w: 10, h: 40, url: 'poster.jpg' },
+            { id: 'poster_1783794652858', x: 765, y: 381, w: 10, h: 40, url: 'p3.jpg' },
+            { id: 'poster_1783794656333', x: 766, y: 467, w: 10, h: 40, url: 'p1.jpg' },
+            { id: 'poster_1783794660824', x: 797, y: 476, w: 10, h: 40, url: 'poster1.jpg' },
+            { id: 'poster_1783794665545', x: 798, y: 322, w: 10, h: 40, url: 'poster2.jpg' }
+        ];
+
+        let selectedPoster = null;
+
+        function updateObjectives() {
+            const tracker = document.getElementById('objective-tracker');
+            tracker.innerHTML = `<b>OBJECTIVES:</b><br>
+            &#x2714; Machines Completed: ${completedMachines.size}/${machines.length}<br>
+            &#x2714; Peoeples Greeted: ${visitedNPCs.size}/${npcs.length}<br>
+            &#x2714; Posters Viewed: ${visitedPosters.size}/${posters.length}<br>
+            <span style="font-size:11px; color:#bdc3c7;">(Defeat DMD once all are 100%)</span>`;
+        }
+
+        function markMachineComplete(machId) {
+            if (!completedMachines.has(machId)) {
+                completedMachines.add(machId);
+                updateObjectives();
+            }
+        }
+
+        let isEditMode = false; let isDraggingObj = false; let dragOffsetX = 0; let dragOffsetY = 0;
+        let isDrawingBox = false; let selectedBoundary = null; let selectedNPC = null; let selectedMachine = null;
+        let drawStartX = 0; let drawStartY = 0; let currentDrawBox = null;
+
+        const btnDebug = document.getElementById('btn-debug');
+        const btnExport = document.getElementById('btn-export');
+        const btnAddNpc = document.getElementById('btn-add-npc');
+        const btnAddMachine = document.getElementById('btn-add-machine');
+        const btnAddPoster = document.getElementById('btn-add-poster');
+        const propPanel = document.getElementById('prop-panel');
+        
+        btnDebug.addEventListener('click', () => {
+            isEditMode = !isEditMode;
+            btnDebug.textContent = isEditMode ? "HITBOXES: ON" : "HITBOXES: OFF";
+            btnDebug.style.background = isEditMode ? "#2ecc71" : "#e74c3c";
+            btnDebug.style.borderColor = isEditMode ? "#27ae60" : "white";
+            document.getElementById('dev-instructions').style.display = isEditMode ? "block" : "none";
+            btnExport.style.display = isEditMode ? "block" : "none";
+            btnAddNpc.style.display = isEditMode ? "block" : "none";
+            btnAddMachine.style.display = isEditMode ? "block" : "none";
+            btnAddPoster.style.display = isEditMode ? "block" : "none";
+            canvas.style.cursor = isEditMode ? "crosshair" : "default";
+            selectedBoundary = null; selectedNPC = null; selectedMachine = null; selectedPoster = null;
+            propPanel.style.display = 'none'; canvas.focus();
+        });
+        
+        btnAddNpc.addEventListener('click', () => {
+            if (!isEditMode) return;
+            const newNPC = { id: 'npc_' + Date.now(), x: 50, y: 50, w: 24, h: 32, color: '#ffffff', gender: 'male', name: 'New Person', dialog: 'Hello!', image: '' };
+            npcs.push(newNPC); selectedNPC = newNPC; selectedBoundary = null; selectedMachine = null; selectedPoster = null; showProperties(newNPC, 'npc');
+        });
+
+        btnAddMachine.addEventListener('click', () => {
+            if (!isEditMode) return;
+            const newMach = { id: 'mach_' + Date.now(), x: 50, y: 50, w: 40, h: 40, name: 'New Machine', type: 'cnc' };
+            machines.push(newMach); selectedMachine = newMach; selectedBoundary = null; selectedNPC = null; selectedPoster = null; showProperties(newMach, 'machine');
+        });
+
+        btnAddPoster.addEventListener('click', () => {
+            if (!isEditMode) return;
+            const newPoster = { id: 'poster_' + Date.now(), x: 50, y: 50, w: 40, h: 40, url: 'poster.png' };
+            posters.push(newPoster); selectedPoster = newPoster; selectedBoundary = null; selectedNPC = null; selectedMachine = null; showProperties(newPoster, 'poster');
+        });
+
+        const propX = document.getElementById('prop-x'); const propY = document.getElementById('prop-y');
+        const propW = document.getElementById('prop-w'); const propH = document.getElementById('prop-h');
+        
+        function showProperties(obj, type) {
+            propPanel.style.display = 'block';
+            propX.value = obj.x; propY.value = obj.y; propW.value = obj.w; propH.value = obj.h;
+            document.getElementById('prop-npc-fields').style.display = type === 'npc' ? 'block' : 'none';
+            document.getElementById('prop-machine-fields').style.display = type === 'machine' ? 'block' : 'none';
+            document.getElementById('prop-poster-fields').style.display = type === 'poster' ? 'block' : 'none';
+
+            if (type === 'npc') {
+                document.getElementById('prop-title').textContent = 'Edit NPC';
+                document.getElementById('prop-name').value = obj.name || ''; document.getElementById('prop-dialog').value = obj.dialog || '';
+                document.getElementById('prop-image').value = obj.image || ''; document.getElementById('prop-color').value = obj.color || '#ffffff';
+                document.getElementById('prop-gender').value = obj.gender || 'male';
+            } else if (type === 'machine') {
+                document.getElementById('prop-title').textContent = 'Edit Machine';
+                document.getElementById('prop-mach-name').value = obj.name || '';
+                document.getElementById('prop-mach-type').value = obj.type || 'cnc';
+            } else if (type === 'poster') {
+                document.getElementById('prop-title').textContent = 'Edit Poster';
+                document.getElementById('prop-poster-url').value = obj.url || '';
+            } else { document.getElementById('prop-title').textContent = 'Edit Wall Block'; }
+        }
+
+        function applyPropChanges() {
+            let target = selectedNPC || selectedMachine || selectedBoundary || selectedPoster; if (!target) return;
+            target.x = parseInt(propX.value) || 0; target.y = parseInt(propY.value) || 0;
+            target.w = parseInt(propW.value) || 0; target.h = parseInt(propH.value) || 0;
+            if (selectedNPC) {
+                selectedNPC.name = document.getElementById('prop-name').value; selectedNPC.dialog = document.getElementById('prop-dialog').value;
+                selectedNPC.image = document.getElementById('prop-image').value; selectedNPC.color = document.getElementById('prop-color').value; selectedNPC.gender = document.getElementById('prop-gender').value;
+            } else if (selectedMachine) {
+                selectedMachine.name = document.getElementById('prop-mach-name').value; selectedMachine.type = document.getElementById('prop-mach-type').value;
+            } else if (selectedPoster) {
+                selectedPoster.url = document.getElementById('prop-poster-url').value;
+            }
+        }
+
+        ['prop-x','prop-y','prop-w','prop-h','prop-name','prop-dialog','prop-image','prop-color','prop-mach-name', 'prop-poster-url'].forEach(id => { document.getElementById(id).addEventListener('input', applyPropChanges); });
+        ['prop-gender', 'prop-mach-type'].forEach(id => { document.getElementById(id).addEventListener('change', applyPropChanges); });
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect(); 
+            const scaleX = canvas.width / rect.width; 
+            const scaleY = canvas.height / rect.height; 
+            const zoomScale = 1.5; 
+            let camX = (canvas.width / 2) / zoomScale - (player.x + player.w / 2); 
+            let camY = (canvas.height / 2) / zoomScale - (player.y + player.h / 2);
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let rawMouseX = (clientX - rect.left) * scaleX; 
+            let rawMouseY = (clientY - rect.top) * scaleY;
+            return { x: Math.round((rawMouseX / zoomScale) - camX), y: Math.round((rawMouseY / zoomScale) - camY) };
+        }
+
+        const handleCanvasDown = (e) => {
+            if (!isEditMode) return;
+            const pos = getMousePos(e);
+            
+            let clickedNPC = npcs.find(n => pos.x >= n.x && pos.x <= n.x + n.w && pos.y >= n.y && pos.y <= n.y + n.h);
+            if (clickedNPC) { selectedNPC = clickedNPC; selectedBoundary = null; selectedMachine = null; selectedPoster = null; isDraggingObj = true; dragOffsetX = pos.x - clickedNPC.x; dragOffsetY = pos.y - clickedNPC.y; showProperties(clickedNPC, 'npc'); return; }
+            
+            let clickedMach = machines.find(m => pos.x >= m.x && pos.x <= m.x + m.w && pos.y >= m.y && pos.y <= m.y + m.h);
+            if (clickedMach) { selectedMachine = clickedMach; selectedBoundary = null; selectedNPC = null; selectedPoster = null; isDraggingObj = true; dragOffsetX = pos.x - clickedMach.x; dragOffsetY = pos.y - clickedMach.y; showProperties(clickedMach, 'machine'); return; }
+            
+            let clickedPoster = posters.find(p => pos.x >= p.x && pos.x <= p.x + p.w && pos.y >= p.y && pos.y <= p.y + p.h);
+            if (clickedPoster) { selectedPoster = clickedPoster; selectedBoundary = null; selectedNPC = null; selectedMachine = null; isDraggingObj = true; dragOffsetX = pos.x - clickedPoster.x; dragOffsetY = pos.y - clickedPoster.y; showProperties(clickedPoster, 'poster'); return; }
+
+            let clickedBoundary = boundaries.find(b => pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h);
+            if (clickedBoundary) { selectedBoundary = clickedBoundary; selectedNPC = null; selectedMachine = null; selectedPoster = null; isDraggingObj = true; dragOffsetX = pos.x - clickedBoundary.x; dragOffsetY = pos.y - clickedBoundary.y; showProperties(clickedBoundary, 'wall'); return; }
+
+            selectedBoundary = null; selectedNPC = null; selectedMachine = null; selectedPoster = null; propPanel.style.display = 'none'; 
+            isDrawingBox = true; drawStartX = pos.x; drawStartY = pos.y; currentDrawBox = { x: pos.x, y: pos.y, w: 0, h: 0 };
+        };
+        canvas.addEventListener('mousedown', handleCanvasDown);
+        canvas.addEventListener('touchstart', handleCanvasDown);
+
+        const handleCanvasMove = (e) => {
+            const pos = getMousePos(e); document.getElementById('mouse-x').textContent = pos.x; document.getElementById('mouse-y').textContent = pos.y;
+            if (!isEditMode) return;
+            if (isDraggingObj) {
+                let target = selectedNPC || selectedMachine || selectedBoundary || selectedPoster;
+                if (target) { target.x = pos.x - dragOffsetX; target.y = pos.y - dragOffsetY; propX.value = target.x; propY.value = target.y; }
+            } else if (isDrawingBox) { currentDrawBox.w = pos.x - drawStartX; currentDrawBox.h = pos.y - drawStartY; }
+        };
+        canvas.addEventListener('mousemove', handleCanvasMove);
+        canvas.addEventListener('touchmove', handleCanvasMove);
+
+        const handleCanvasUp = () => {
+            if (!isEditMode) return;
+            if (isDraggingObj) { isDraggingObj = false; } 
+            else if (isDrawingBox) {
+                isDrawingBox = false;
+                let finalX = currentDrawBox.w < 0 ? currentDrawBox.x + currentDrawBox.w : currentDrawBox.x;
+                let finalY = currentDrawBox.h < 0 ? currentDrawBox.y + currentDrawBox.h : currentDrawBox.y;
+                let finalW = Math.abs(currentDrawBox.w); let finalH = Math.abs(currentDrawBox.h);
+                if (finalW > 5 && finalH > 5) {
+                    boundaries.push({ x: finalX, y: finalY, w: finalW, h: finalH });
+                    selectedBoundary = boundaries[boundaries.length - 1]; showProperties(selectedBoundary, 'wall');
+                }
+                currentDrawBox = null;
+            }
+        };
+        canvas.addEventListener('mouseup', handleCanvasUp);
+        canvas.addEventListener('touchend', handleCanvasUp);
+
+        // --- KEYBOARD LOGIC ---
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            attemptPlayBGM();
+
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault(); 
+                
+                if (isQaActive || isGameFinished) return; 
+
+                if (!isEditMode) {
+                    if (isBattleActive) {
+                        advancePokemonBattle();
+                    }
+                    else if (isPosterActive) {
+                        closePoster();
+                    }
+                    else if (isDialogActive) {
+                        if (!isTyping && currentDialogPageIdx < currentDialogPages.length - 1) {
+                            currentDialogPageIdx++;
+                            playDialogPage();
+                        } else if (!isTyping) {
+                            closeDialog();
+                        } else {
+                            clearTimeout(typeWriterTimeout);
+                            dialogText.textContent = currentFullText;
+                            isTyping = false;
+                        }
+                    }
+                    else if (!isSimActive) checkInteraction();
+                }
+                return;
+            }
+
+            let k = e.key.toLowerCase();
+            if (e.key === 'ArrowUp') k = 'ArrowUp'; if (e.key === 'ArrowDown') k = 'ArrowDown';
+            if (e.key === 'ArrowLeft') k = 'ArrowLeft'; if (e.key === 'ArrowRight') k = 'ArrowRight';
+
+            if (isEditMode && (e.key === 'Backspace' || e.key === 'Delete')) {
+                if (selectedBoundary) boundaries = boundaries.filter(b => b !== selectedBoundary);
+                else if (selectedNPC) npcs = npcs.filter(n => n !== selectedNPC);
+                else if (selectedMachine) machines = machines.filter(m => m !== selectedMachine);
+                else if (selectedPoster) posters = posters.filter(p => p !== selectedPoster);
+                selectedBoundary = null; selectedNPC = null; selectedMachine = null; selectedPoster = null; propPanel.style.display = 'none';
+            }
+
+            if (keys.hasOwnProperty(k)) { keys[k] = true; e.preventDefault(); }
+        });
+
+        window.addEventListener('keyup', (e) => { 
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            let k = e.key.toLowerCase();
+            if (e.key === 'ArrowUp') k = 'ArrowUp'; if (e.key === 'ArrowDown') k = 'ArrowDown';
+            if (e.key === 'ArrowLeft') k = 'ArrowLeft'; if (e.key === 'ArrowRight') k = 'ArrowRight';
+            if (keys.hasOwnProperty(k)) { keys[k] = false; }
+        });
+
+        btnExport.addEventListener('click', () => {
+            const textarea = document.getElementById('export-text');
+            let exportStr = "let boundaries = [\n";
+            boundaries.forEach((b, i) => { exportStr += `    {x: ${b.x}, y: ${b.y}, w: ${b.w}, h: ${b.h}}${i < boundaries.length-1 ? ',' : ''}\n`; });
+            exportStr += "];\n\nlet npcs = [\n";
+            npcs.forEach((n, i) => { exportStr += `    { id: '${n.id}', x: ${n.x}, y: ${n.y}, w: ${n.w}, h: ${n.h}, color: '${n.color}', name: '${n.name}', dialog: '${n.dialog.replace(/'/g, "\\'")}', gender: '${n.gender}', image: '${n.image || ''}' }${i < npcs.length-1 ? ',' : ''}\n`; });
+            exportStr += "];\n\nlet machines = [\n";
+            machines.forEach((m, i) => { exportStr += `    { id: '${m.id}', x: ${m.x}, y: ${m.y}, w: ${m.w}, h: ${m.h}, name: '${m.name}', type: '${m.type}' }${i < machines.length-1 ? ',' : ''}\n`; });
+            exportStr += "];\n\nlet posters = [\n";
+            posters.forEach((p, i) => { exportStr += `    { id: '${p.id}', x: ${p.x}, y: ${p.y}, w: ${p.w}, h: ${p.h}, url: '${p.url}' }${i < posters.length-1 ? ',' : ''}\n`; });
+            exportStr += "];";
+            textarea.value = exportStr; document.getElementById('export-modal').style.display = 'block';
+        });
+        document.getElementById('close-export').addEventListener('click', () => { document.getElementById('export-modal').style.display = 'none'; canvas.focus(); });
+
+        function showDialog(id, name, text, imageSrc) {
+            if (!visitedNPCs.has(id)) {
+                visitedNPCs.add(id);
+                updateObjectives();
+            }
+
+            isDialogActive = true; 
+            dialogBox.style.display = 'block';
+            dialogSpeaker.textContent = name; 
+            
+            const portraitImg = document.getElementById('dialog-portrait');
+            if (imageSrc && imageSrc.trim() !== '') { portraitImg.src = imageSrc; portraitImg.style.display = 'block'; } 
+            else { portraitImg.style.display = 'none'; }
+            
+            currentDialogPages = text.split('|').filter(line => line.trim() !== '');
+            if (currentDialogPages.length === 0) currentDialogPages = ["..."];
+            currentDialogPageIdx = 0;
+            
+            playDialogPage();
+        }
+
+        function playDialogPage() {
+            if(typeWriterTimeout) clearTimeout(typeWriterTimeout);
+            currentFullText = currentDialogPages[currentDialogPageIdx];
+            dialogText.textContent = ''; 
+            isTyping = true;
+            let i = 0;
+            
+            const instructionEl = document.getElementById('dialog-instruction');
+            if (currentDialogPageIdx < currentDialogPages.length - 1) {
+                instructionEl.textContent = "Press SPACE to continue ▼";
+            } else {
+                instructionEl.textContent = "Press SPACE to close";
+            }
+
+            function typeWriter() { 
+                if (i < currentFullText.length) { 
+                    dialogText.textContent += currentFullText.charAt(i); 
+                    i++; 
+                    typeWriterTimeout = setTimeout(typeWriter, 30); 
+                } else {
+                    isTyping = false;
+                }
+            }
+            typeWriter();
+        }
+
+        function closeDialog() { 
+            isDialogActive = false; 
+            dialogBox.style.display = 'none'; 
+            if(typeWriterTimeout) clearTimeout(typeWriterTimeout); 
+            isTyping = false;
+
+            if (dialogSpeaker.textContent.includes('DMD') && completedMachines.size >= machines.length && visitedNPCs.size >= npcs.length && visitedPosters.size >= posters.length) {
+                BarricadeEngine.open();
+            } else if (dialogSpeaker.textContent === 'Engr. Dela Cruz') {
+                const enemyNPC = npcs.find(n => n.name === 'Engr. Dela Cruz');
+                if (enemyNPC) startPokemonBattle(enemyNPC);
+            } else if (dialogSpeaker.textContent === 'Engr. Seña' && !senaCleared) {
+                openSenaQA();
+            }
+        }
+
+        document.getElementById('qa-hint').addEventListener('click', function() {
+            this.style.display = 'none';
+            document.getElementById('qa-hint-text').style.display = 'block';
+        });
+
+        function openSenaQA() {
+            isQaActive = true;
+            document.getElementById('qa-modal').style.display = 'block';
+            document.getElementById('qa-input').value = '';
+            document.getElementById('qa-input').focus();
+            document.getElementById('qa-hint').style.display = 'block';
+            document.getElementById('qa-hint-text').style.display = 'none';
+        }
+
+        document.getElementById('qa-submit').addEventListener('click', () => {
+            const val = document.getElementById('qa-input').value.trim().toUpperCase();
+            if (val === 'UPHSD') {
+                document.getElementById('qa-modal').style.display = 'none';
+                isQaActive = false;
+                senaCleared = true;
+                showDialog('prof_me', 'Engr. Seña', 'Excellent! You may proceed with exploring the lab.', 'b.png');
+                canvas.focus();
+            } else {
+                alert('Incorrect. Take another look at the poster and try again!');
+            }
+        });
+
+        function openPoster(poster) {
+            if (!visitedPosters.has(poster.id)) {
+                visitedPosters.add(poster.id);
+                updateObjectives();
+            }
+            isPosterActive = true;
+            document.getElementById('poster-image-display').src = poster.url || '';
+            document.getElementById('poster-modal').style.display = 'block';
+        }
+
+        function closePoster() {
+            isPosterActive = false;
+            document.getElementById('poster-modal').style.display = 'none';
+            document.getElementById('poster-image-display').src = '';
+        }
+
+        let machineScene, machineCamera, machineRenderer, blockMesh, targetMesh;
+        let currentMachType = '';
+        const NUM_SLICES = 41; const SLICE_WIDTH = 10;
+        let blockSlices = []; let targetSlices = []; let isCarving = false; let machineAnimId;
+
+        function createWoodTexture() {
+            const tCanvas = document.createElement('canvas'); tCanvas.width = 512; tCanvas.height = 512; const tCtx = tCanvas.getContext('2d');
+            tCtx.fillStyle = '#c17a38'; tCtx.fillRect(0, 0, 512, 512); tCtx.lineWidth = 3;
+            for (let i = 0; i < 300; i++) {
+                tCtx.beginPath(); let startY = Math.random() * 512; tCtx.moveTo(0, startY);
+                let ctrlY = startY + (Math.random() - 0.5) * 100;
+                tCtx.bezierCurveTo(170, ctrlY, 340, ctrlY, 512, startY + (Math.random() - 0.5) * 50);
+                tCtx.strokeStyle = `rgba(92, 58, 33, ${Math.random() * 0.4 + 0.1})`; tCtx.stroke();
+            }
+            const texture = new THREE.CanvasTexture(tCanvas); texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1, 2); 
+            return texture;
+        }
+
+        function createMetalTexture() {
+            const tCanvas = document.createElement('canvas'); tCanvas.width = 512; tCanvas.height = 512; const tCtx = tCanvas.getContext('2d');
+            tCtx.fillStyle = '#95a5a6'; tCtx.fillRect(0, 0, 512, 512); 
+            
+            for (let i = 0; i < 1500; i++) {
+                tCtx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.2})`;
+                tCtx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 80 + 10, Math.random() * 2 + 1);
+                tCtx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.2})`;
+                tCtx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 80 + 10, Math.random() * 2 + 1);
+            }
+            
+            for (let i = 0; i < 40; i++) {
+                tCtx.beginPath();
+                tCtx.arc(Math.random() * 512, Math.random() * 512, Math.random() * 12 + 3, 0, Math.PI * 2);
+                tCtx.fillStyle = `rgba(30, 30, 30, ${Math.random() * 0.4 + 0.1})`;
+                tCtx.fill();
+            }
+
+            tCtx.lineWidth = 1.5;
+            for (let i = 0; i < 60; i++) {
+                tCtx.beginPath();
+                let sx = Math.random() * 512; let sy = Math.random() * 512;
+                tCtx.moveTo(sx, sy);
+                tCtx.lineTo(sx + (Math.random() - 0.5) * 40, sy + (Math.random() - 0.5) * 40);
+                tCtx.strokeStyle = `rgba(20, 20, 20, ${Math.random() * 0.5})`;
+                tCtx.stroke();
+            }
+            
+            const texture = new THREE.CanvasTexture(tCanvas); texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1, 1); 
+            return texture;
+        }
+
+        function initThreeMachineGame(machType) {
+            currentMachType = machType;
+            blockSlices = new Array(NUM_SLICES).fill(65); targetSlices = new Array(NUM_SLICES).fill(0);
+            
+            if (machType === 'lathe') {
+                for(let i=0; i<NUM_SLICES; i++) {
+                    if (i >= 5 && i < 12) targetSlices[i] = 55; else if (i >= 12 && i < 15) targetSlices[i] = 30; 
+                    else if (i >= 15 && i < 26) targetSlices[i] = 18; else if (i >= 26 && i < 34) targetSlices[i] = 40; 
+                    else targetSlices[i] = 0; 
+                }
+            } else if (machType === 'cnc') {
+                for(let i=0; i<NUM_SLICES; i++) {
+                    if (i <= 10) targetSlices[i] = 45;
+                    else if (i <= 25) targetSlices[i] = 20;
+                    else targetSlices[i] = 35;
+                }
+            }
+
+            const latheCanvas = document.getElementById('lathe-canvas');
+            if (!machineRenderer) {
+                machineRenderer = new THREE.WebGLRenderer({ canvas: latheCanvas, antialias: true }); machineRenderer.setSize(410, 150);
+                machineScene = new THREE.Scene(); machineScene.background = new THREE.Color('#1a252f');
+                machineCamera = new THREE.OrthographicCamera(410/-2, 410/2, 150/2, 150/-2, 1, 1000); machineCamera.position.z = 100;
+                
+                machineScene.add(new THREE.AmbientLight(0xffffff, 0.7));
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(0, 50, 100); machineScene.add(dirLight);
+
+                blockMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial()); 
+                targetMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
+                
+                blockMesh.rotation.z = -Math.PI / 2; targetMesh.rotation.z = -Math.PI / 2;
+                machineScene.add(blockMesh); machineScene.add(targetMesh);
+
+                latheCanvas.addEventListener('mousedown', () => { isCarving = true; }); 
+                latheCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); isCarving = true; }, { passive: false });
+                window.addEventListener('mouseup', () => { isCarving = false; }); 
+                window.addEventListener('touchend', () => { isCarving = false; });
+                latheCanvas.addEventListener('mousemove', handleLatheCarve);
+                latheCanvas.addEventListener('touchmove', handleLatheCarve, { passive: false });
+            }
+
+            let targetColor = machType === 'cnc' ? 0x00ffcc : 0xffffff;
+            targetMesh.material = new THREE.MeshBasicMaterial({ color: targetColor, transparent: true, opacity: 0.5, wireframe: true });
+
+            if (machType === 'cnc') {
+                blockMesh.material = new THREE.MeshStandardMaterial({ map: createMetalTexture(), roughness: 0.3, metalness: 0.8, side: THREE.DoubleSide });
+            } else {
+                blockMesh.material = new THREE.MeshPhongMaterial({ map: createWoodTexture(), color: 0xffffff, specular: 0x111111, shininess: 15, side: THREE.DoubleSide });
+            }
+
+            updateMachineGeometry(); document.getElementById('lathe-result-overlay').style.display = 'none';
+            if (machineAnimId) cancelAnimationFrame(machineAnimId); animateMachine();
+        }
+
+        function executeCNCCode() {
+            const btn = document.getElementById('btn-sim-start');
+            btn.disabled = true;
+            const codeLines = document.getElementById('cnc-code-input').value.toUpperCase().split('\n');
+            const statusBox = document.getElementById('cnc-status');
+            
+            let spindleOn = false;
+            let currentZ = 0;
+            let lineIdx = 0;
+            
+            let execInterval = setInterval(() => {
+                if (lineIdx >= codeLines.length) {
+                    clearInterval(execInterval);
+                    statusBox.textContent = "Execution complete.";
+                    setTimeout(evaluateMachineProduct, 1000);
+                    return;
+                }
+                
+                let line = codeLines[lineIdx].trim();
+                lineIdx++;
+                if (!line) return;
+                
+                statusBox.textContent = "Executing: " + line;
+                
+                if (line.includes('M03')) spindleOn = true;
+                if (line.includes('M05')) spindleOn = false;
+                
+                if (line.startsWith('G01') || line.startsWith('G00')) {
+                    let matchX = line.match(/X(\d+)/);
+                    let matchZ = line.match(/Z(\d+)/);
+                    
+                    if (matchX && matchZ) {
+                        let targetX = parseInt(matchX[1]);
+                        let targetZ = parseInt(matchZ[1]);
+                        
+                        if (spindleOn) {
+                            let start = Math.max(0, Math.min(currentZ, targetZ));
+                            let end = Math.min(NUM_SLICES - 1, Math.max(currentZ, targetZ));
+                            
+                            for (let i = start; i <= end; i++) {
+                                blockSlices[i] = Math.min(blockSlices[i], targetX);
+                                blockSlices[i] = Math.max(0.1, blockSlices[i]);
+                            }
+                            updateMachineGeometry();
+                        }
+                        currentZ = targetZ;
+                    }
+                }
+            }, 500);
+            
+            simInterval = execInterval;
+        }
+
+        function handleLatheCarve(e) {
+            if (!isCarving || currentMachType !== 'lathe') return;
+            if (e.touches) e.preventDefault();
+            const latheCanvas = document.getElementById('lathe-canvas'); 
+            const rect = latheCanvas.getBoundingClientRect();
+            const scaleX = latheCanvas.width / rect.width;
+            const scaleY = latheCanvas.height / rect.height;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const mouseX = (clientX - rect.left) * scaleX; 
+            const mouseY = (clientY - rect.top) * scaleY; 
+            const cy = latheCanvas.height / 2;
+            const cutRadius = Math.abs(mouseY - cy); 
+            const sliceIndex = Math.floor(mouseX / SLICE_WIDTH);
+            
+            if (sliceIndex >= 0 && sliceIndex < NUM_SLICES) {
+                if (cutRadius < blockSlices[sliceIndex]) {
+                    blockSlices[sliceIndex] = Math.max(0.1, cutRadius); 
+                    if (sliceIndex > 0) blockSlices[sliceIndex-1] = Math.min(blockSlices[sliceIndex-1], cutRadius + 12);
+                    if (sliceIndex < NUM_SLICES-1) blockSlices[sliceIndex+1] = Math.min(blockSlices[sliceIndex+1], cutRadius + 12);
+                    updateMachineGeometry();
+                }
+            }
+        }
+
+        function updateMachineGeometry() {
+            const points = []; const targetPoints = []; const startY = - (NUM_SLICES * SLICE_WIDTH) / 2;
+            for(let i=0; i<NUM_SLICES; i++) {
+                points.push(new THREE.Vector2(Math.max(0.1, blockSlices[i]), startY + i * SLICE_WIDTH));
+                targetPoints.push(new THREE.Vector2(Math.max(0.1, targetSlices[i]), startY + i * SLICE_WIDTH));
+            }
+            const oldBlockGeo = blockMesh.geometry; blockMesh.geometry = new THREE.LatheGeometry(points, 32); if (oldBlockGeo) oldBlockGeo.dispose();
+            const oldTargetGeo = targetMesh.geometry; targetMesh.geometry = new THREE.LatheGeometry(targetPoints, 16); if (oldTargetGeo) oldTargetGeo.dispose();
+        }
+
+        function animateMachine() {
+            if (!isSimActive) return;
+            machineAnimId = requestAnimationFrame(animateMachine);
+            if (blockMesh) blockMesh.rotateY(0.15); 
+            if (machineRenderer) machineRenderer.render(machineScene, machineCamera);
+        }
+
+        function evaluateMachineProduct() {
+            let error = 0; for(let i=0; i<NUM_SLICES; i++) { error += Math.abs(blockSlices[i] - targetSlices[i]); }
+            let accuracy = Math.max(0, 100 - (error / (NUM_SLICES * 2))); 
+            const overlay = document.getElementById('lathe-result-overlay');
+            const accText = document.getElementById('lathe-accuracy-text');
+            const fbText = document.getElementById('lathe-feedback-text');
+            
+            overlay.style.display = 'flex';
+            if (accuracy >= 85) { 
+                accText.style.color = '#2ecc71'; accText.textContent = `Great Job! Accuracy: ${accuracy.toFixed(1)}%`; fbText.textContent = ""; 
+                if (activeMachine) markMachineComplete(activeMachine.id);
+            } else { 
+                accText.style.color = '#e74c3c'; accText.textContent = `Failed Spec! Accuracy: ${accuracy.toFixed(1)}%`; fbText.textContent = `Try matching the wireframe exactly (Need >= 85%).`; 
+            }
+            
+            setTimeout(() => { 
+                if (isSimActive && document.getElementById('machine-container').style.display === 'block') { 
+                    overlay.style.display = 'none'; initThreeMachineGame(currentMachType); 
+                    if (currentMachType === 'cnc') {
+                        document.getElementById('cnc-status').textContent = 'Ready for M/G-Code input.';
+                        document.getElementById('btn-sim-start').disabled = false;
+                    }
+                } 
+            }, 4000);
+        }
+
+        let refrigAnimId;
+        let currentRefStage = 1;
+        let refParticles = [];
+
+        function initRefrigerationGame() {
+            const refrigCanvas = document.getElementById('refrig-canvas');
+            if (!refrigCanvas) return;
+            currentRefStage = 1;
+            
+            refParticles = [];
+            for(let i=0; i<40; i++) {
+                refParticles.push({ offset: (i/40) * 800 });
+            }
+            
+            if(refrigAnimId) cancelAnimationFrame(refrigAnimId);
+            animateRefrigeration();
+        }
+
+        function animateRefrigeration() {
+            if(!isSimActive || document.getElementById('refrig-container').style.display === 'none') return;
+            const refrigCanvas = document.getElementById('refrig-canvas');
+            const rCtx = refrigCanvas.getContext('2d');
+            
+            rCtx.clearRect(0,0,410,460);
+            rCtx.shadowBlur = 0; 
+            
+            rCtx.strokeStyle = '#e74c3c'; rCtx.lineWidth = 2; rCtx.strokeRect(10, 10, 390, 60);
+            rCtx.fillStyle = 'rgba(231, 76, 60, 0.1)'; rCtx.fillRect(10, 10, 390, 60);
+            
+            rCtx.fillStyle = '#fff'; rCtx.font = 'bold 14px monospace';
+            let stageTitles = [
+                "STAGE 1 \u2192 2 - COMPRESSION",
+                "STAGE 2 \u2192 3 - CONDENSATION",
+                "STAGE 3 \u2192 4 - EXPANSION",
+                "STAGE 4 \u2192 1 - EVAPORATION"
+            ];
+            let stageDescs = [
+                "Compressor raises pressure and temperature of low-pressure vapor",
+                "Condenser rejects heat (Q_H), converting vapor to high-pressure liquid",
+                "Expansion valve drops pressure drastically, creating cold mixture",
+                "Evaporator absorbs heat (Q_L), converting liquid back to vapor"
+            ];
+            rCtx.fillStyle = '#e74c3c';
+            rCtx.fillText(stageTitles[currentRefStage-1], 20, 30);
+            rCtx.fillStyle = '#bdc3c7'; rCtx.font = '12px sans-serif';
+            rCtx.fillText(stageDescs[currentRefStage-1], 20, 50);
+            
+            for(let i=1; i<=4; i++) {
+                rCtx.beginPath(); rCtx.arc(320 + i*15, 25, 6, 0, Math.PI*2);
+                rCtx.fillStyle = (i === currentRefStage) ? '#e74c3c' : '#34495e';
+                rCtx.fill();
+            }
+            
+            const evpX = 50, evpY = 320, evpW = 100, evpH = 60;
+            const cmpX = 300, cmpY = 350, cmpR = 35;
+            const cndX = 250, cndY = 80, cndW = 100, cndH = 60;
+            const expX = 90, expY = 95, expW = 20, expH = 30;
+
+            const isActive = (stage) => currentRefStage === stage;
+            const getAlpha = (stage) => isActive(stage) ? 1.0 : 0.3;
+            
+            rCtx.lineWidth = 6;
+            
+            rCtx.globalAlpha = getAlpha(1);
+            rCtx.strokeStyle = '#3498db'; rCtx.beginPath(); rCtx.moveTo(evpX+evpW, evpY+30); rCtx.lineTo(cmpX-cmpR, cmpY); rCtx.stroke();
+            
+            rCtx.globalAlpha = getAlpha(2);
+            rCtx.strokeStyle = '#e74c3c'; rCtx.beginPath(); rCtx.moveTo(cmpX, cmpY-cmpR); rCtx.lineTo(cndX+50, cndY+cndH); rCtx.stroke();
+            
+            rCtx.globalAlpha = getAlpha(3);
+            rCtx.strokeStyle = '#f1c40f'; rCtx.beginPath(); rCtx.moveTo(cndX, cndY+30); rCtx.lineTo(expX+expW, expY+15); rCtx.stroke();
+            
+            rCtx.globalAlpha = getAlpha(4);
+            rCtx.strokeStyle = '#1abc9c'; rCtx.beginPath(); rCtx.moveTo(expX+10, expY+expH); rCtx.lineTo(evpX+50, evpY); rCtx.stroke();
+            
+            refParticles.forEach(p => {
+                p.offset += 2; if(p.offset > 800) p.offset = 0;
+                let px, py, color, stage;
+                if(p.offset < 200) { 
+                    let t = p.offset/200; px = 150 + t*(115); py = 350; color = '#3498db'; stage = 1;
+                } else if(p.offset < 400) { 
+                    let t = (p.offset-200)/200; px = 300; py = 315 - t*(175); color = '#e74c3c'; stage = 2;
+                } else if(p.offset < 600) { 
+                    let t = (p.offset-400)/200; px = 250 - t*(140); py = 110; color = '#f1c40f'; stage = 3;
+                } else { 
+                    let t = (p.offset-600)/200; px = 100; py = 125 + t*(195); color = '#1abc9c'; stage = 4;
+                }
+                rCtx.globalAlpha = getAlpha(stage);
+                rCtx.beginPath(); rCtx.arc(px, py, 4, 0, Math.PI*2); rCtx.fillStyle = color; rCtx.fill();
+            });
+
+            rCtx.globalAlpha = getAlpha(1);
+            if(isActive(1)) { rCtx.shadowBlur = 15; rCtx.shadowColor = '#e74c3c'; }
+            rCtx.fillStyle = '#2c3e50'; rCtx.strokeStyle = '#e74c3c'; rCtx.lineWidth = 3;
+            rCtx.beginPath(); rCtx.arc(cmpX, cmpY, cmpR, 0, Math.PI*2); rCtx.fill(); rCtx.stroke();
+            rCtx.fillStyle = '#e74c3c';
+            rCtx.beginPath(); rCtx.moveTo(cmpX-15, cmpY+10); rCtx.lineTo(cmpX+15, cmpY+10); rCtx.lineTo(cmpX, cmpY-15); rCtx.fill();
+            rCtx.shadowBlur = 0;
+            rCtx.font = 'bold 11px sans-serif'; rCtx.fillText("COMPRESSOR", cmpX-35, cmpY+cmpR+15);
+            rCtx.fillStyle = '#1abc9c'; rCtx.fillText("← W_in", cmpX+cmpR+5, cmpY+5);
+
+            rCtx.globalAlpha = getAlpha(2);
+            if(isActive(2)) { rCtx.shadowBlur = 15; rCtx.shadowColor = '#e67e22'; }
+            rCtx.fillStyle = '#2c3e50'; rCtx.strokeStyle = '#e67e22';
+            rCtx.beginPath(); rCtx.roundRect(cndX, cndY, cndW, cndH, 5); rCtx.fill(); rCtx.stroke();
+            rCtx.beginPath(); rCtx.moveTo(cndX, cndY+15); rCtx.lineTo(cndX+cndW-10, cndY+15); rCtx.lineTo(cndX+10, cndY+30); rCtx.lineTo(cndX+cndW-10, cndY+30); rCtx.lineTo(cndX+10, cndY+45); rCtx.lineTo(cndX+cndW, cndY+45); rCtx.stroke();
+            rCtx.beginPath(); rCtx.arc(cndX+cndW/2, cndY-15, 10, 0, Math.PI*2); rCtx.stroke();
+            rCtx.beginPath(); rCtx.moveTo(cndX+cndW/2-7, cndY-22); rCtx.lineTo(cndX+cndW/2+7, cndY-8); rCtx.moveTo(cndX+cndW/2-7, cndY-8); rCtx.lineTo(cndX+cndW/2+7, cndY-22); rCtx.stroke();
+            rCtx.shadowBlur = 0;
+            rCtx.fillStyle = '#e67e22'; rCtx.fillText("CONDENSER", cndX+15, cndY+cndH+15);
+            rCtx.fillStyle = '#e74c3c'; rCtx.fillText("↑↑ Q_H", cndX+cndW+5, cndY+20);
+
+            rCtx.globalAlpha = getAlpha(3);
+            if(isActive(3)) { rCtx.shadowBlur = 15; rCtx.shadowColor = '#1abc9c'; }
+            rCtx.fillStyle = '#7f8c8d'; rCtx.strokeStyle = '#1abc9c'; 
+            rCtx.beginPath(); rCtx.moveTo(expX, expY); rCtx.lineTo(expX+expW, expY+expH); rCtx.lineTo(expX, expY+expH); rCtx.lineTo(expX+expW, expY); rCtx.closePath(); rCtx.fill(); rCtx.stroke();
+            rCtx.beginPath(); rCtx.moveTo(expX+expW/2, expY+expH/2); rCtx.lineTo(expX+expW/2, expY-10); rCtx.lineTo(expX+expW/2-10, expY-10); rCtx.lineTo(expX+expW/2+10, expY-10); rCtx.stroke();
+            rCtx.shadowBlur = 0;
+            rCtx.fillStyle = '#1abc9c'; rCtx.fillText("EXP. VALVE", expX-25, expY-20);
+
+            rCtx.globalAlpha = getAlpha(4);
+            if(isActive(4)) { rCtx.shadowBlur = 15; rCtx.shadowColor = '#3498db'; }
+            rCtx.fillStyle = '#2c3e50'; rCtx.strokeStyle = '#3498db';
+            rCtx.beginPath(); rCtx.roundRect(evpX, evpY, evpW, evpH, 5); rCtx.fill(); rCtx.stroke();
+            rCtx.beginPath(); rCtx.moveTo(evpX+evpW/2, evpY); rCtx.lineTo(evpX+evpW/2, evpY+15); rCtx.lineTo(evpX+10, evpY+15); rCtx.lineTo(evpX+evpW-10, evpY+30); rCtx.lineTo(evpX+10, evpY+45); rCtx.lineTo(evpX+evpW, evpY+45); rCtx.stroke();
+            rCtx.shadowBlur = 0;
+            rCtx.fillStyle = '#3498db'; rCtx.fillText("EVAPORATOR", evpX+10, evpY-10);
+            rCtx.fillText("↑↑ Q_L", evpX+30, evpY+evpH+15);
+
+            rCtx.globalAlpha = 1.0;
+
+            const drawNode = (x, y, num, temp, color) => {
+                rCtx.beginPath(); rCtx.arc(x, y, 10, 0, Math.PI*2); rCtx.fillStyle = color; rCtx.fill();
+                rCtx.fillStyle = '#fff'; rCtx.font = 'bold 12px sans-serif'; rCtx.fillText(num, x-4, y+4);
+                rCtx.fillStyle = color; rCtx.fillText(temp, x-20, y-15);
+            }
+            drawNode(200, 350, '1', "T1=-5°C", '#3498db');
+            drawNode(300, 240, '2', "T2=86.5°C", '#e74c3c');
+            drawNode(180, 110, '3', "T3=37°C", '#f1c40f');
+            drawNode(100, 230, '4', "T4=-10°C", '#1abc9c');
+            
+            rCtx.strokeStyle = '#3498db'; rCtx.lineWidth = 1; rCtx.strokeRect(170, 230, 70, 40);
+            rCtx.fillStyle = '#bdc3c7'; rCtx.font = '10px monospace'; rCtx.fillText("COP", 195, 245);
+            rCtx.fillStyle = '#3498db'; rCtx.font = 'bold 16px sans-serif'; rCtx.fillText("1.73", 185, 262);
+            
+            rCtx.strokeStyle = '#7f8c8d'; rCtx.strokeRect(160, 400, 240, 50);
+            rCtx.fillStyle = '#bdc3c7'; rCtx.font = '10px monospace';
+            rCtx.fillText("ENERGY BALANCE", 165, 415);
+            rCtx.fillStyle = '#3498db'; rCtx.fillText("Q_L(evap) = 5 kW", 165, 430);
+            rCtx.fillStyle = '#1abc9c'; rCtx.fillText("W_in(comp)= 2.89 kW", 165, 445);
+            rCtx.fillStyle = '#e74c3c'; rCtx.fillText("Q_H(cond) = 7.89 kW", 280, 430);
+            rCtx.fillStyle = '#bdc3c7'; rCtx.fillText("Q_L + W = Q_H", 280, 445);
+            
+            refrigAnimId = requestAnimationFrame(animateRefrigeration);
+        }
+
+        function advanceRefrigerationStage() {
+            currentRefStage++;
+            if(currentRefStage > 4) {
+                currentRefStage = 1;
+                if (activeMachine) markMachineComplete(activeMachine.id);
+            }
+        }
+
+        let gearsAnimId;
+        let gearList = [];
+        let draggingGear = null;
+        let gearDragOffsetX = 0, gearDragOffsetY = 0;
+
+        function initGearsGame() {
+            const gearsCanvas = document.getElementById('gears-canvas');
+            if (!gearsCanvas) return;
+
+            gearList = [
+                { id: 1, x: 80, y: 350, r: 40, teeth: 16, c: '#e74c3c', fixed: true, driver: true, speed: 0.02, rot: 0 }, 
+                { id: 2, x: 300, y: 100, r: 50, teeth: 20, c: '#2ecc71', fixed: true, driven: true, speed: 0, rot: 0 }, 
+                { id: 3, x: 80, y: 80, r: 30, teeth: 12, c: '#d2a679', fixed: false, speed: 0, rot: 0 }, 
+                { id: 4, x: 340, y: 350, r: 60, teeth: 24, c: '#d2a679', fixed: false, speed: 0, rot: 0 }, 
+                { id: 5, x: 180, y: 400, r: 40, teeth: 16, c: '#d2a679', fixed: false, speed: 0, rot: 0 },  
+                { id: 6, x: 380, y: 420, r: 25, teeth: 10, c: '#d2a679', fixed: false, speed: 0, rot: 0 }   
+            ];
+
+            const handleGearStart = (e) => {
+                if (e.touches) e.preventDefault();
+                const rect = gearsCanvas.getBoundingClientRect();
+                const scaleX = gearsCanvas.width / rect.width;
+                const scaleY = gearsCanvas.height / rect.height;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const mx = (clientX - rect.left) * scaleX;
+                const my = (clientY - rect.top) * scaleY;
+                
+                for (let i = gearList.length - 1; i >= 0; i--) {
+                    let g = gearList[i];
+                    if (!g.fixed) {
+                        let dist = Math.hypot(g.x - mx, g.y - my);
+                        if (dist <= g.r) {
+                            draggingGear = g;
+                            gearDragOffsetX = mx - g.x;
+                            gearDragOffsetY = my - g.y;
+                            gearList.splice(i, 1);
+                            gearList.push(g);
+                            break;
+                        }
+                    }
+                }
+            };
+            gearsCanvas.onmousedown = handleGearStart;
+            gearsCanvas.ontouchstart = handleGearStart;
+
+            const handleGearMove = (e) => {
+                if (draggingGear) {
+                    if (e.touches) e.preventDefault();
+                    const rect = gearsCanvas.getBoundingClientRect();
+                    const scaleX = gearsCanvas.width / rect.width;
+                    const scaleY = gearsCanvas.height / rect.height;
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    draggingGear.x = (clientX - rect.left) * scaleX - gearDragOffsetX;
+                    draggingGear.y = (clientY - rect.top) * scaleY - gearDragOffsetY;
+                }
+            };
+            gearsCanvas.onmousemove = handleGearMove;
+            gearsCanvas.ontouchmove = handleGearMove;
+
+            gearsCanvas.onmouseup = () => { draggingGear = null; };
+            gearsCanvas.ontouchend = () => { draggingGear = null; };
+            gearsCanvas.onmouseleave = () => { draggingGear = null; };
+
+            document.getElementById('gears-status').textContent = "Connect the Red gear to the Green gear! (Goal: CCW spin)";
+            document.getElementById('gears-status').style.color = '#f1c40f';
+
+            if(gearsAnimId) cancelAnimationFrame(gearsAnimId);
+            animateGears();
+        }
+
+        function calculateGearPhysics() {
+            gearList.forEach(g => { if (!g.driver) g.speed = 0; });
+            
+            let queue = gearList.filter(g => g.driver);
+            let visited = new Set();
+            queue.forEach(g => visited.add(g.id));
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                
+                gearList.forEach(next => {
+                    if (!visited.has(next.id)) {
+                        let dist = Math.hypot(curr.x - next.x, curr.y - next.y);
+                        let targetDist = curr.r + next.r;
+                        if (Math.abs(dist - targetDist) < 8) {
+                            next.speed = curr.speed * -(curr.r / next.r);
+                            visited.add(next.id);
+                            queue.push(next);
+                        }
+                    }
+                });
+            }
+
+            let drivenGear = gearList.find(g => g.driven);
+            if (drivenGear && drivenGear.speed < -0.0001) {
+                document.getElementById('gears-status').textContent = "SUCCESS! POWER TRANSMITTED (CCW).";
+                document.getElementById('gears-status').style.color = '#2ecc71';
+            } else if (drivenGear && drivenGear.speed > 0.0001) {
+                document.getElementById('gears-status').textContent = "Wrong direction! Green gear is spinning Clockwise.";
+                document.getElementById('gears-status').style.color = '#e74c3c';
+            } else {
+                document.getElementById('gears-status').textContent = "Connect the Red gear to the Green gear! (Goal: CCW spin)";
+                document.getElementById('gears-status').style.color = '#f1c40f';
+            }
+        }
+
+        function drawSingleGear(ctx, x, y, radius, teeth, color, rotation) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, radius - 5, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.stroke();
+
+            ctx.beginPath(); ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, radius * 0.3, 0, Math.PI * 2); ctx.stroke();
+
+            ctx.fillStyle = color;
+            const angleStep = (Math.PI * 2) / teeth;
+            for (let i = 0; i < teeth; i++) {
+                ctx.save();
+                ctx.rotate(i * angleStep);
+                ctx.beginPath();
+                ctx.moveTo(radius - 6, -4);
+                ctx.lineTo(radius + 4, -2);
+                ctx.lineTo(radius + 4, 2);
+                ctx.lineTo(radius - 6, 4);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#111';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function animateGears() {
+            if(!isSimActive || document.getElementById('gears-container').style.display === 'none') return;
+            const gearsCanvas = document.getElementById('gears-canvas');
+            const gCtx = gearsCanvas.getContext('2d');
+            
+            gCtx.clearRect(0,0,410,460);
+
+            gCtx.strokeStyle = 'rgba(139, 69, 19, 0.1)';
+            gCtx.lineWidth = 2;
+            for (let i=0; i<410; i+=20) {
+                gCtx.beginPath(); gCtx.moveTo(i, 0); gCtx.lineTo(i + Math.sin(i)*10, 460); gCtx.stroke();
+            }
+
+            calculateGearPhysics();
+
+            gearList.forEach(g => {
+                g.rot += g.speed;
+                gCtx.shadowColor = 'rgba(0,0,0,0.5)';
+                gCtx.shadowBlur = 10;
+                gCtx.shadowOffsetX = 3;
+                gCtx.shadowOffsetY = 3;
+                drawSingleGear(gCtx, g.x, g.y, g.r, g.teeth, g.c, g.rot);
+                gCtx.shadowBlur = 0; 
+            });
+
+            gearsAnimId = requestAnimationFrame(animateGears);
+        }
+
+        function openSimulation(mach) {
+            isSimActive = true;
+            activeMachine = mach;
+            document.getElementById('simulation-modal').style.display = 'block';
+            document.getElementById('sim-title').textContent = mach.name;
+            
+            if (mach.type === 'lathe' || mach.type === 'cnc') {
+                startMachineSound(); 
+            }
+
+            const screen = document.getElementById('sim-screen'); const btn = document.getElementById('btn-sim-start');
+            const latheInstruction = document.getElementById('lathe-instruction'); const machineContainer = document.getElementById('machine-container');
+            const cncUiContainer = document.getElementById('cnc-ui-container');
+            const refContainer = document.getElementById('refrig-container');
+            const gearsContainer = document.getElementById('gears-container');
+            
+            screen.style.display = 'none';
+            cncUiContainer.style.display = 'none';
+            refContainer.style.display = 'none';
+            machineContainer.style.display = 'none';
+            latheInstruction.style.display = 'none';
+            gearsContainer.style.display = 'none';
+
+            if (mach.type === 'lathe') {
+                machineContainer.style.display = 'block'; latheInstruction.style.display = 'block';
+                btn.textContent = "SUBMIT PRODUCT"; btn.disabled = false; 
+                initThreeMachineGame('lathe');
+                btn.onclick = evaluateMachineProduct;
+
+            } else if (mach.type === 'cnc') {
+                machineContainer.style.display = 'block'; cncUiContainer.style.display = 'block';
+                document.getElementById('cnc-status').textContent = 'Ready for M/G-Code input.';
+                
+                if(!document.getElementById('cnc-code-input').value || document.getElementById('cnc-code-input').value.includes('X45 Z15')) {
+                     document.getElementById('cnc-code-input').value = "M03\nG01 X45 Z10\nG01 X20 Z25\nG01 X35 Z40";
+                }
+
+                btn.textContent = "EXECUTE G-CODE"; btn.disabled = false;
+                initThreeMachineGame('cnc');
+                btn.onclick = executeCNCCode;
+
+            } else if (mach.type === 'refrigeration') {
+                refContainer.style.display = 'block';
+                btn.textContent = "NEXT STAGE"; 
+                btn.disabled = false;
+                initRefrigerationGame();
+                btn.onclick = advanceRefrigerationStage;
+
+            } else if (mach.type === 'gears') {
+                gearsContainer.style.display = 'block';
+                btn.textContent = "CHECK SOLUTION"; 
+                btn.disabled = false;
+                initGearsGame();
+                btn.onclick = () => {
+                    let drivenGear = gearList.find(g => g.driven);
+                    if (drivenGear && drivenGear.speed < -0.0001) {
+                        alert("Puzzle Solved! The Green gear rotates Counter-Clockwise!");
+                        markMachineComplete(activeMachine.id);
+                        document.getElementById('btn-sim-close').click();
+                    } else if (drivenGear && drivenGear.speed > 0.0001) {
+                        alert("The Green gear is rotating Clockwise! Add or remove a gear to reverse the direction.");
+                    } else {
+                        alert("The Green gear is not rotating yet. Keep trying!");
+                    }
+                };
+
+            } else {
+                screen.style.display = 'block';
+                screen.innerHTML = `Connected to ${mach.type.toUpperCase()} interface.\nStatus: IDLE\nAwaiting command...`;
+                btn.textContent = "START OPERATION"; btn.disabled = false;
+                btn.onclick = function() { runTerminalSimulation(mach.type); };
+            }
+        }
+
+        document.getElementById('btn-sim-close').addEventListener('click', () => {
+            document.getElementById('simulation-modal').style.display = 'none';
+            isSimActive = false; clearInterval(simInterval);
+            stopMachineSound(); 
+            if (machineAnimId) cancelAnimationFrame(machineAnimId);
+            if (refrigAnimId) cancelAnimationFrame(refrigAnimId);
+            if (gearsAnimId) cancelAnimationFrame(gearsAnimId);
+            canvas.focus();
+        });
+
+        function runTerminalSimulation(type) {
+            const screen = document.getElementById('sim-screen'); const btn = document.getElementById('btn-sim-start');
+            btn.disabled = true; screen.innerHTML = `Initializing ${type.toUpperCase()}...\n`;
+            let progress = 0; 
+            let steps = ['Starting system...', 'Pressurizing...', 'Heating...', 'Regulating flow...', 'Maintaining pressure.'];
+            let stepIdx = 0;
+            simInterval = setInterval(() => {
+                if (stepIdx < steps.length) { screen.innerHTML += `\n> ${steps[stepIdx]}`; screen.scrollTop = screen.scrollHeight; stepIdx++; } 
+                else {
+                    if (progress <= 100) {
+                        let bar = '[' + '='.repeat(Math.floor(progress/10)) + ' '.repeat(10 - Math.floor(progress/10)) + ']';
+                        let lines = screen.innerHTML.split('\n'); if (lines[lines.length-1].startsWith('[')) lines.pop(); 
+                        screen.innerHTML = lines.join('\n') + `\n${bar} ${progress}%`; screen.scrollTop = screen.scrollHeight; progress += 20;
+                    } else { 
+                        screen.innerHTML += `\n\n<span style="color:#f1c40f">OPERATION SUCCESSFUL.</span>`; 
+                        screen.scrollTop = screen.scrollHeight; btn.disabled = false; clearInterval(simInterval); 
+                        if (activeMachine) markMachineComplete(activeMachine.id);
+                    }
+                }
+            }, 600);
+        }
+
+        function checkRectOverlap(rect1, rect2) { return (rect1.x < rect2.x + rect2.w && rect1.x + rect1.w > rect2.x && rect1.y < rect2.y + rect2.h && rect1.y + rect1.h > rect2.y); }
+        function checkInteraction() {
+            let reach = 30; let interactBox = { x: player.x, y: player.y, w: player.w, h: player.h };
+            if (player.facing === 'up') { interactBox.y -= reach; interactBox.h += reach; } if (player.facing === 'down') { interactBox.h += reach; }
+            if (player.facing === 'left') { interactBox.x -= reach; interactBox.w += reach; } if (player.facing === 'right') { interactBox.w += reach; }
+            
+            for (let npc of npcs) { 
+                if (checkRectOverlap(interactBox, npc)) { 
+                    if (npc.name.includes('DMD')) {
+                        if (completedMachines.size >= machines.length && visitedNPCs.size >= npcs.length && visitedPosters.size >= posters.length) {
+                            showDialog(npc.id, npc.name, "Sometimes you win, Sometimes you learn|Tara roblox?", npc.image);
+                        } else {
+                            showDialog(npc.id, npc.name, "Finish your tour first! Talk to everyone, check all posters, and complete all machines.", npc.image);
+                        }
+                    } else {
+                        showDialog(npc.id, npc.name, npc.dialog, npc.image); 
+                    }
+                    return; 
+                } 
+            }
+            for (let mach of machines) { if (checkRectOverlap(interactBox, mach)) { openSimulation(mach); return; } }
+            for (let poster of posters) { if (checkRectOverlap(interactBox, poster)) { openPoster(poster); return; } }
+        }
+
+        function isColliding(targetBox) {
+            for (let obs of boundaries) if (checkRectOverlap(targetBox, obs)) return true;
+            for (let npc of npcs) if (checkRectOverlap(targetBox, npc)) return true;
+            for (let mach of machines) if (checkRectOverlap(targetBox, mach)) return true; 
+            return false;
+        }
+
+        function update() {
+            if (isDialogActive || isEditMode || isSimActive || isBattleActive || isPosterActive || isQaActive || isGameFinished) return; 
+
+            player.dx = 0; player.dy = 0; let isMoving = false;
+            if (keys.ArrowLeft || keys.a) { player.dx = -player.speed; player.facing = 'left'; isMoving = true; }
+            if (keys.ArrowRight || keys.d) { player.dx = player.speed; player.facing = 'right'; isMoving = true; }
+            if (keys.ArrowUp || keys.w) { player.dy = -player.speed; player.facing = 'up'; isMoving = true; }
+            if (keys.ArrowDown || keys.s) { player.dy = player.speed; player.facing = 'down'; isMoving = true; }
+
+            if (isMoving) {
+                player.walkTimer++;
+                if (player.walkTimer > 10) { player.walkTimer = 0; player.walkFrame = player.walkFrame === 1 ? 2 : 1; }
+                
+                if (Date.now() - lastStepTime > 400) { 
+                    playFootstep(); lastStepTime = Date.now();
+                }
+            } else { player.walkFrame = 0; player.walkTimer = 0; }
+
+            if (player.dx !== 0) {
+                let nextXBox = { x: player.x + player.dx, y: player.y, w: player.w, h: player.h };
+                if (!isColliding(nextXBox)) player.x += player.dx;
+            }
+            if (player.dy !== 0) {
+                let nextYBox = { x: player.x, y: player.y + player.dy, w: player.w, h: player.h };
+                if (!isColliding(nextYBox)) player.y += player.dy;
+            }
+        }
+
+        function drawCharacter(renderCtx, x, y, w, h, color, facing, gender, isPlayer, walkFrame) {
+            renderCtx.fillStyle = 'rgba(0,0,0,0.3)'; renderCtx.beginPath(); renderCtx.ellipse(x + w/2, y + h, w/2, 5, 0, 0, Math.PI * 2); renderCtx.fill();
+            let leftLegY = y + h - 5; let rightLegY = y + h - 5;
+            if (walkFrame === 1) leftLegY -= 4; if (walkFrame === 2) rightLegY -= 4; 
+            
+            if (gender === 'female') {
+                renderCtx.fillStyle = color; renderCtx.fillRect(x + 2, y + h - 10, w - 4, 10);
+                renderCtx.fillStyle = '#ffdfc4'; renderCtx.fillRect(x + 4, leftLegY, 4, 5); renderCtx.fillRect(x + w - 8, rightLegY, 4, 5);
+            } else {
+                renderCtx.fillStyle = '#34495e'; renderCtx.fillRect(x + 4, leftLegY - 5, 4, 10); renderCtx.fillRect(x + w - 8, rightLegY - 5, 4, 10);
+            }
+
+            renderCtx.fillStyle = color; renderCtx.fillRect(x + 2, y + 10, w - 4, h - 15);
+            
+            if (isPlayer) {
+                renderCtx.fillStyle = '#f39c12'; 
+                if (facing === 'right') renderCtx.fillRect(x - 2, y + 12, 4, 10);
+                if (facing === 'left') renderCtx.fillRect(x + w - 2, y + 12, 4, 10);
+                if (facing === 'up') renderCtx.fillRect(x + 4, y + 10, w - 8, 12);
+            }
+
+            renderCtx.fillStyle = '#ffdfc4'; renderCtx.fillRect(x + 4, y - 5, w - 8, 15);
+            renderCtx.fillStyle = '#4a2311'; 
+            if (gender === 'female') {
+                renderCtx.fillRect(x + 2, y - 6, w - 4, 5); renderCtx.fillRect(x + 2, y - 1, 3, 14); renderCtx.fillRect(x + w - 5, y - 1, 3, 14); 
+            } else { renderCtx.fillRect(x + 3, y - 6, w - 6, 6); }
+
+            if (isPlayer) {
+                renderCtx.fillStyle = '#c0392b'; renderCtx.fillRect(x + 3, y - 7, w - 6, 5);
+                if (facing === 'up') renderCtx.fillRect(x + 5, y - 9, w - 10, 2); 
+                else if (facing === 'right') renderCtx.fillRect(x + w - 4, y - 7, 4, 2); 
+                else if (facing === 'left') renderCtx.fillRect(x, y - 7, 4, 2); 
+                else if (facing === 'down') renderCtx.fillRect(x + 1, y - 7, w - 2, 2); 
+            }
+
+            renderCtx.fillStyle = '#000';
+            if (facing === 'down') { renderCtx.fillRect(x + 6, y, 2, 2); renderCtx.fillRect(x + w - 8, y, 2, 2); } 
+            else if (facing === 'left') { renderCtx.fillRect(x + 4, y, 2, 2); } 
+            else if (facing === 'right') { renderCtx.fillRect(x + w - 6, y, 2, 2); }
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const zoomScale = 1.5; 
+            let camX = (canvas.width / 2) / zoomScale - (player.x + player.w / 2);
+            let camY = (canvas.height / 2) / zoomScale - (player.y + player.h / 2);
+
+            ctx.save(); ctx.scale(zoomScale, zoomScale); ctx.translate(camX, camY);
+
+            if (imageLoaded) { ctx.drawImage(mapImage, 0, 0, MAP_WIDTH, MAP_HEIGHT); } 
+            else { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT); }
+
+            if (isEditMode) {
+                for (let obs of boundaries) {
+                    ctx.fillStyle = obs === selectedBoundary ? 'rgba(241, 196, 15, 0.6)' : 'rgba(255, 0, 0, 0.4)';
+                    ctx.strokeStyle = obs === selectedBoundary ? '#f1c40f' : 'red';
+                    ctx.lineWidth = 2; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+                }
+                for (let mach of machines) {
+                    ctx.fillStyle = mach === selectedMachine ? 'rgba(241, 196, 15, 0.6)' : 'rgba(155, 89, 182, 0.4)';
+                    ctx.strokeStyle = mach === selectedMachine ? '#f1c40f' : '#9b59b6';
+                    ctx.lineWidth = 2; ctx.fillRect(mach.x, mach.y, mach.w, mach.h); ctx.strokeRect(mach.x, mach.y, mach.w, mach.h);
+                }
+                for (let poster of posters) {
+                    ctx.fillStyle = poster === selectedPoster ? 'rgba(241, 196, 15, 0.6)' : 'rgba(52, 152, 219, 0.4)';
+                    ctx.strokeStyle = poster === selectedPoster ? '#f1c40f' : '#3498db';
+                    ctx.lineWidth = 2; ctx.fillRect(poster.x, poster.y, poster.w, poster.h); ctx.strokeRect(poster.x, poster.y, poster.w, poster.h);
+                }
+            }
+
+            for (let npc of npcs) drawCharacter(ctx, npc.x, npc.y, npc.w, npc.h, npc.color, 'down', npc.gender, false, 0);
+            drawCharacter(ctx, player.x, player.y, player.w, player.h, player.color, player.facing, player.gender, true, player.walkFrame);
+            ctx.restore(); 
+        }
+
+        function gameLoop() { update(); drawGame(); requestAnimationFrame(gameLoop); }
+        
+        window.onload = function() { 
+            attemptPlayBGM(); 
+            updateObjectives(); 
+            gameLoop(); 
+        };
+
+        // --- MOBILE CONTROLS INTEGRATION ---
+        const setupMobileBtn = (id, keyName) => {
+            const btn = document.getElementById(id);
+            if(!btn) return;
+            btn.addEventListener('touchstart', (e) => { 
+                e.preventDefault(); 
+                keys[keyName] = true; 
+            }, { passive: false });
+            btn.addEventListener('touchend', (e) => { 
+                e.preventDefault(); 
+                keys[keyName] = false; 
+            }, { passive: false });
+        };
+        
+        setupMobileBtn('btn-up', 'ArrowUp');
+        setupMobileBtn('btn-down', 'ArrowDown');
+        setupMobileBtn('btn-left', 'ArrowLeft');
+        setupMobileBtn('btn-right', 'ArrowRight');
+
+        const btnSpace = document.getElementById('btn-space');
+        if(btnSpace) {
+            btnSpace.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true }));
+            }, { passive: false });
+        }
+
+        const BarricadeEngine = (function() {
+            const GRID_SIZE = 9;
+            const TOTAL_WALLS = 10;
+            const P1_COLOR = '#3b82f6';
+            const P2_COLOR = '#ef4444';
+            const WALL_COLOR = '#fbbf24';
+
+            let gameState = 'menu'; 
+            let winner = null;
+            let turn = 'p1'; 
+            let p1Walls = TOTAL_WALLS;
+            let p2Walls = TOTAL_WALLS;
+            let errorMsg = '';
+            let isAI = false;
+            let aiTimer = null;
+
+            const game = { boardSize: 0, cellSize: 0, offsetX: 0, offsetY: 0, p1: { x: 4, y: 8 }, p2: { x: 4, y: 0 }, hWalls: [], vWalls: [], hoverCell: null, hoverWall: null, wallOrientation: 'h' };
+
+            const b_canvas = document.getElementById('b_gameCanvas');
+            const b_ctx = b_canvas.getContext('2d');
+            const modal = document.getElementById('barricade-modal');
+            
+            const p1Ui = document.getElementById('b-p1-ui');
+            const p2Ui = document.getElementById('b-p2-ui');
+            const p1Card = document.getElementById('b-p1-card');
+            const p2Card = document.getElementById('b-p2-card');
+            const p1WallsContainer = document.getElementById('b-p1-walls-container');
+            const p2WallsContainer = document.getElementById('b-p2-walls-container');
+            const menuScreen = document.getElementById('b-menu-screen');
+            const gameoverScreen = document.getElementById('b-gameover-screen');
+            const winnerText = document.getElementById('b-winner-text');
+            const errorToast = document.getElementById('b-error-toast');
+
+            function open() {
+                modal.style.display = 'flex';
+                isSimActive = true; 
+                gameState = 'menu';
+                updateUI();
+                handleResize();
+            }
+
+            function close() {
+                modal.style.display = 'none';
+                isSimActive = false; 
+                canvas.focus();
+            }
+
+            function returnToMenu() {
+                if (winner === 'blue') {
+                    close();
+                    document.getElementById('finish-screen').style.display = 'flex';
+                } else {
+                    gameState = 'menu';
+                    updateUI();
+                }
+            }
+
+            function updateUI() {
+                menuScreen.style.display = gameState === 'menu' ? 'flex' : 'none';
+                gameoverScreen.style.display = gameState === 'gameover' ? 'flex' : 'none';
+
+                if (gameState === 'gameover') {
+                    const isBlue = winner === 'blue';
+                    document.getElementById('b-gameover-card').style.backgroundColor = isBlue ? 'rgba(59,130,246,0.2)' : 'rgba(239,68,68,0.2)';
+                    document.getElementById('b-gameover-card').style.border = `1px solid ${isBlue ? '#3b82f6' : '#ef4444'}`;
+                    winnerText.style.color = isBlue ? '#60a5fa' : '#f87171';
+                    winnerText.innerText = `${winner} WINS!`;
+                }
+
+                p1Ui.style.opacity = gameState === 'playing' ? '1' : '0';
+                p2Ui.style.opacity = gameState === 'playing' ? '1' : '0';
+                p1Ui.style.pointerEvents = gameState === 'playing' ? 'auto' : 'none';
+                p2Ui.style.pointerEvents = gameState === 'playing' ? 'auto' : 'none';
+
+                if (turn === 'p1') { p1Card.classList.add('active'); p2Card.classList.remove('active'); }
+                else { p2Card.classList.add('active'); p1Card.classList.remove('active'); }
+
+                p1WallsContainer.innerHTML = Array.from({length: TOTAL_WALLS}).map((_, i) => `<div class="b-wall-pip" style="background-color: ${i < p1Walls ? '#fbbf24' : '#333'}"></div>`).join('');
+                p2WallsContainer.innerHTML = Array.from({length: TOTAL_WALLS}).map((_, i) => `<div class="b-wall-pip" style="background-color: ${i < p2Walls ? '#fbbf24' : '#333'}"></div>`).join('');
+
+                if (errorMsg) {
+                    errorToast.innerText = errorMsg; errorToast.style.display = 'block';
+                    setTimeout(() => { errorToast.style.display = 'none'; errorMsg = ''; }, 2000);
+                }
+            }
+
+            function handleResize() {
+                if (modal.style.display === 'none') return;
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const dpr = window.devicePixelRatio || 1;
+                b_canvas.width = width * dpr;
+                b_canvas.height = height * dpr;
+                b_ctx.scale(dpr, dpr);
+                b_canvas.style.width = `${width}px`;
+                b_canvas.style.height = `${height}px`;
+
+                const padding = 20;
+                game.boardSize = Math.min(width - padding * 2, height - 160, 600);
+                game.cellSize = game.boardSize / GRID_SIZE;
+                game.offsetX = (width - game.boardSize) / 2;
+                game.offsetY = (height - game.boardSize) / 2 + 10;
+                drawGame();
+            }
+            window.addEventListener('resize', handleResize);
+
+            function getBFSPathLength(startNode, targetRow, hWalls, vWalls) {
+                const queue = [{x: startNode.x, y: startNode.y, dist: 0}];
+                const visited = new Set([`${startNode.x},${startNode.y}`]);
+                while (queue.length > 0) {
+                    const curr = queue.shift();
+                    if (curr.y === targetRow) return curr.dist;
+                    const dirs = [ {dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0} ];
+                    for (const d of dirs) {
+                        const nx = curr.x + d.dx, ny = curr.y + d.dy;
+                        if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && !visited.has(`${nx},${ny}`)) {
+                            let blocked = false;
+                            if (d.dy === -1 && hWalls.some(w => w.y === curr.y && (w.x === curr.x || w.x === curr.x - 1))) blocked = true;
+                            else if (d.dy === 1 && hWalls.some(w => w.y === ny && (w.x === curr.x || w.x === curr.x - 1))) blocked = true;
+                            else if (d.dx === -1 && vWalls.some(w => w.x === curr.x && (w.y === curr.y || w.y === curr.y - 1))) blocked = true;
+                            else if (d.dx === 1 && vWalls.some(w => w.x === nx && (w.y === curr.y || w.y === curr.y - 1))) blocked = true;
+                            if (!blocked) { visited.add(`${nx},${ny}`); queue.push({x: nx, y: ny, dist: curr.dist + 1}); }
+                        }
+                    }
+                }
+                return Infinity;
+            }
+
+            function isValidWall(type, x, y) {
+                if (x < 0 || y < 0) return false;
+                if (type === 'h' && (x >= GRID_SIZE - 1 || y >= GRID_SIZE || y === 0)) return false;
+                if (type === 'v' && (y >= GRID_SIZE - 1 || x >= GRID_SIZE || x === 0)) return false;
+                if (type === 'h') {
+                    if (game.hWalls.some(w => w.y === y && Math.abs(w.x - x) <= 1)) return false;
+                    if (game.vWalls.some(w => w.x === x + 1 && w.y === y - 1)) return false;
+                } else {
+                    if (game.vWalls.some(w => w.x === x && Math.abs(w.y - y) <= 1)) return false;
+                    if (game.hWalls.some(w => w.y === y + 1 && w.x === x - 1)) return false;
+                }
+                const testHW = type === 'h' ? [...game.hWalls, {x, y}] : game.hWalls;
+                const testVW = type === 'v' ? [...game.vWalls, {x, y}] : game.vWalls;
+                return getBFSPathLength(game.p1, 0, testHW, testVW) !== Infinity && getBFSPathLength(game.p2, GRID_SIZE - 1, testHW, testVW) !== Infinity;
+            }
+
+            function getValidMoves(pPos, oPos) {
+                const moves = [];
+                const dirs = [ {dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0} ];
+                for (const d of dirs) {
+                    let nx = pPos.x + d.dx, ny = pPos.y + d.dy;
+                    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                        let blocked = false;
+                        if (d.dy === -1 && game.hWalls.some(w => w.y === pPos.y && (w.x === pPos.x || w.x === pPos.x - 1))) blocked = true;
+                        else if (d.dy === 1 && game.hWalls.some(w => w.y === ny && (w.x === pPos.x || w.x === pPos.x - 1))) blocked = true;
+                        else if (d.dx === -1 && game.vWalls.some(w => w.x === pPos.x && (w.y === pPos.y || w.y === pPos.y - 1))) blocked = true;
+                        else if (d.dx === 1 && game.vWalls.some(w => w.x === nx && (w.y === pPos.y || w.y === pPos.y - 1))) blocked = true;
+                        if (!blocked) {
+                            if (nx === oPos.x && ny === oPos.y) {
+                                let jx = nx + d.dx, jy = ny + d.dy, jumpB = false;
+                                if (d.dy === -1 && game.hWalls.some(w => w.y === ny && (w.x === nx || w.x === nx - 1))) jumpB = true;
+                                else if (d.dy === 1 && game.hWalls.some(w => w.y === jy && (w.x === nx || w.x === nx - 1))) jumpB = true;
+                                else if (d.dx === -1 && game.vWalls.some(w => w.x === nx && (w.y === ny || w.y === ny - 1))) jumpB = true;
+                                else if (d.dx === 1 && game.vWalls.some(w => w.x === jx && (w.y === ny || w.y === ny - 1))) jumpB = true;
+                                if (jx >= 0 && jx < GRID_SIZE && jy >= 0 && jy < GRID_SIZE && !jumpB) moves.push({x: jx, y: jy});
+                            } else moves.push({x: nx, y: ny});
+                        }
+                    }
+                }
+                return moves;
+            }
+
+            function drawGame() {
+                b_ctx.fillStyle = '#0a0a0a'; b_ctx.fillRect(0, 0, b_canvas.width, b_canvas.height);
+                b_ctx.fillStyle = '#1e1e1e'; b_ctx.fillRect(game.offsetX, game.offsetY, game.boardSize, game.boardSize);
+                
+                b_ctx.strokeStyle = '#333'; b_ctx.lineWidth = 2;
+                for (let i = 1; i < GRID_SIZE; i++) {
+                    b_ctx.beginPath(); b_ctx.moveTo(game.offsetX + i * game.cellSize, game.offsetY); b_ctx.lineTo(game.offsetX + i * game.cellSize, game.offsetY + game.boardSize); b_ctx.stroke();
+                    b_ctx.beginPath(); b_ctx.moveTo(game.offsetX, game.offsetY + i * game.cellSize); b_ctx.lineTo(game.offsetX + game.boardSize, game.offsetY + i * game.cellSize); b_ctx.stroke();
+                }
+                b_ctx.strokeRect(game.offsetX, game.offsetY, game.boardSize, game.boardSize);
+
+                if (gameState === 'playing') {
+                    const cP = turn === 'p1' ? game.p1 : game.p2;
+                    const oP = turn === 'p1' ? game.p2 : game.p1;
+                    const vM = getValidMoves(cP, oP);
+                    b_ctx.fillStyle = turn === 'p1' ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.15)';
+                    vM.forEach(m => b_ctx.fillRect(game.offsetX + m.x * game.cellSize, game.offsetY + m.y * game.cellSize, game.cellSize, game.cellSize));
+
+                    if (game.hoverCell && vM.some(m => m.x === game.hoverCell.x && m.y === game.hoverCell.y)) {
+                        b_ctx.fillStyle = turn === 'p1' ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.4)';
+                        b_ctx.fillRect(game.offsetX + game.hoverCell.x * game.cellSize, game.offsetY + game.hoverCell.y * game.cellSize, game.cellSize, game.cellSize);
+                    }
+                }
+
+                const drawWall = (w, isHover = false) => {
+                    const hW = 8 / 2;
+                    b_ctx.fillStyle = isHover ? 'rgba(251,191,36,0.5)' : WALL_COLOR;
+                    if (!isHover && isHover !== false) b_ctx.fillStyle = 'rgba(239,68,68,0.5)'; 
+                    if (w.type === 'h') b_ctx.fillRect(game.offsetX + w.x * game.cellSize, game.offsetY + w.y * game.cellSize - hW, game.cellSize * 2, 8);
+                    else b_ctx.fillRect(game.offsetX + w.x * game.cellSize - hW, game.offsetY + w.y * game.cellSize, 8, game.cellSize * 2);
+                };
+
+                game.hWalls.forEach(w => drawWall({type: 'h', ...w}));
+                game.vWalls.forEach(w => drawWall({type: 'v', ...w}));
+
+                if (gameState === 'playing' && game.hoverWall) {
+                    const currW = turn === 'p1' ? p1Walls : p2Walls;
+                    if (currW > 0) drawWall(game.hoverWall, isValidWall(game.hoverWall.type, game.hoverWall.x, game.hoverWall.y) ? true : null);
+                }
+
+                const drawP = (p, color) => {
+                    b_ctx.beginPath(); b_ctx.arc(game.offsetX + p.x * game.cellSize + game.cellSize / 2, game.offsetY + p.y * game.cellSize + game.cellSize / 2, game.cellSize * 0.35, 0, Math.PI * 2);
+                    b_ctx.fillStyle = color; b_ctx.fill(); b_ctx.lineWidth = 3; b_ctx.strokeStyle = '#fff'; b_ctx.stroke();
+                };
+                drawP(game.p2, P2_COLOR); drawP(game.p1, P1_COLOR);
+            }
+
+            function handlePointerMove(e) {
+                if (gameState !== 'playing' || (isAI && turn === 'p2')) return; 
+                const rect = b_canvas.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left - game.offsetX;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top - game.offsetY;
+
+                game.hoverCell = null; game.hoverWall = null;
+                if (x >= 0 && x <= game.boardSize && y >= 0 && y <= game.boardSize) {
+                    const col = Math.floor(x / game.cellSize), row = Math.floor(y / game.cellSize);
+                    const rX = x % game.cellSize, rY = y % game.cellSize, zone = game.cellSize * 0.25; 
+                    let isLine = false;
+
+                    if (rY < zone && row > 0) { game.wallOrientation = 'h'; game.hoverWall = { type: 'h', x: Math.min(Math.max(col, 0), GRID_SIZE - 2), y: row }; isLine = true; } 
+                    else if (rY > game.cellSize - zone && row < GRID_SIZE - 1) { game.wallOrientation = 'h'; game.hoverWall = { type: 'h', x: Math.min(Math.max(col, 0), GRID_SIZE - 2), y: row + 1 }; isLine = true; } 
+                    else if (rX < zone && col > 0) { game.wallOrientation = 'v'; game.hoverWall = { type: 'v', x: col, y: Math.min(Math.max(row, 0), GRID_SIZE - 2) }; isLine = true; } 
+                    else if (rX > game.cellSize - zone && col < GRID_SIZE - 1) { game.wallOrientation = 'v'; game.hoverWall = { type: 'v', x: col + 1, y: Math.min(Math.max(row, 0), GRID_SIZE - 2) }; isLine = true; }
+                    if (!isLine && col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) game.hoverCell = { x: col, y: row };
+                }
+                drawGame();
+            }
+
+            function triggerAI() {
+                if (gameState !== 'playing' || !isAI || turn !== 'p2') return;
+                clearTimeout(aiTimer);
+                aiTimer = setTimeout(() => {
+                    const p1Dist = getBFSPathLength(game.p1, 0, game.hWalls, game.vWalls);
+                    const moves = getValidMoves(game.p2, game.p1).sort(() => Math.random() - 0.5);
+                    let bestM = null, bestMVal = Infinity;
+                    
+                    for (let m of moves) {
+                        const dist = getBFSPathLength(m, GRID_SIZE - 1, game.hWalls, game.vWalls);
+                        if (dist - p1Dist + (dist * 0.01) < bestMVal) { bestMVal = dist - p1Dist + (dist * 0.01); bestM = m; }
+                    }
+
+                    let bestW = null, bestWVal = Infinity;
+                    if (p2Walls > 0) {
+                        const isDesp = p1Dist <= 3;
+                        const evalWall = (type, x, y) => {
+                            if (!isValidWall(type, x, y)) return;
+                            const tHW = type === 'h' ? [...game.hWalls, {x,y}] : game.hWalls;
+                            const tVW = type === 'v' ? [...game.vWalls, {x,y}] : game.vWalls;
+                            const nP1 = getBFSPathLength(game.p1, 0, tHW, tVW), nP2 = getBFSPathLength(game.p2, GRID_SIZE-1, tHW, tVW);
+                            let p1D = nP1 - p1Dist, p2D = nP2 - getBFSPathLength(game.p2, GRID_SIZE-1, game.hWalls, game.vWalls);
+                            if (p1D === 0 && !isDesp) return;
+                            
+                            let wV = nP2 - nP1 + (p2D * 3.0) - (p1D * 2.0);
+                            if (p1D > 2) wV -= (p1D * 1.5);
+                            if (isDesp && p1Dist <= 2 && p1D > 0) wV -= 100;
+                            wV += (p2Walls <= 4 ? 1.5 : 0.8) + ((Math.abs(game.p1.x - x) + Math.abs(game.p1.y - y)) * 0.02);
+                            
+                            if (wV < bestWVal) { bestWVal = wV; bestW = {type, x, y}; }
+                        };
+                        for (let y = 1; y < GRID_SIZE; y++) for (let x = 0; x < GRID_SIZE - 1; x++) evalWall('h', x, y);
+                        for (let x = 1; x < GRID_SIZE; x++) for (let y = 0; y < GRID_SIZE - 1; y++) evalWall('v', x, y);
+                    }
+
+                    if (bestW && bestWVal < bestMVal - 0.75) {
+                        if (bestW.type === 'h') game.hWalls.push(bestW); else game.vWalls.push(bestW);
+                        p2Walls--;
+                    } else if (bestM) { game.p2.x = bestM.x; game.p2.y = bestM.y; }
+
+                    if (game.p2.y === GRID_SIZE - 1) { winner = 'red'; gameState = 'gameover'; } else turn = 'p1';
+                    updateUI(); drawGame();
+                }, 600);
+            }
+
+            function handlePointerDown(e) {
+                if (gameState !== 'playing' || (isAI && turn === 'p2')) return; 
+                errorMsg = '';
+                
+                handlePointerMove(e);
+                
+                if (game.hoverCell) {
+                    const cP = turn === 'p1' ? game.p1 : game.p2, oP = turn === 'p1' ? game.p2 : game.p1;
+                    if (getValidMoves(cP, oP).some(m => m.x === game.hoverCell.x && m.y === game.hoverCell.y)) {
+                        if (turn === 'p1') {
+                            game.p1.x = game.hoverCell.x; game.p1.y = game.hoverCell.y;
+                            if (game.p1.y === 0) { winner = 'blue'; gameState = 'gameover'; } else { turn = 'p2'; if (isAI) triggerAI(); }
+                        } else {
+                            game.p2.x = game.hoverCell.x; game.p2.y = game.hoverCell.y;
+                            if (game.p2.y === GRID_SIZE - 1) { winner = 'red'; gameState = 'gameover'; } else turn = 'p1';
+                        }
+                        updateUI(); drawGame(); return;
+                    }
+                }
+
+                if (game.hoverWall) {
+                    if ((turn === 'p1' ? p1Walls : p2Walls) <= 0) { errorMsg = 'No walls left!'; updateUI(); return; }
+                    if (isValidWall(game.hoverWall.type, game.hoverWall.x, game.hoverWall.y)) {
+                        if (game.hoverWall.type === 'h') game.hWalls.push({...game.hoverWall});
+                        else game.vWalls.push({...game.hoverWall});
+                        if (turn === 'p1') { p1Walls--; turn = 'p2'; if (isAI) triggerAI(); } else { p2Walls--; turn = 'p1'; }
+                        game.hoverWall = null; updateUI(); drawGame();
+                    } else { errorMsg = 'Invalid wall placement!'; updateUI(); }
+                }
+            }
+
+            b_canvas.addEventListener('mousemove', handlePointerMove);
+            b_canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+            b_canvas.addEventListener('mousedown', handlePointerDown);
+            b_canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+            b_canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); if (gameState === 'playing' && game.hoverWall) { game.wallOrientation = game.wallOrientation === 'h' ? 'v' : 'h'; handlePointerMove(e); } });
+
+            return {
+                open, close, returnToMenu,
+                initGame: function(vsAI) {
+                    isAI = vsAI; game.p1 = { x: 4, y: 8 }; game.p2 = { x: 4, y: 0 };
+                    game.hWalls = []; game.vWalls = []; p1Walls = TOTAL_WALLS; p2Walls = TOTAL_WALLS;
+                    turn = 'p1'; gameState = 'playing'; winner = null; errorMsg = '';
+                    updateUI(); handleResize(); drawGame();
+                }
+            };
+        })();
+    </script>
+</body>
+</html>

@@ -303,6 +303,10 @@
                 width: 100% !important;
                 height: auto !important;
             }
+            /* Force exact proportions so mobile browsers do not squash the height */
+            #lathe-canvas { aspect-ratio: 410 / 150 !important; }
+            #refrig-canvas, #gears-canvas { aspect-ratio: 410 / 460 !important; }
+            #battle-player-canvas { aspect-ratio: 150 / 200 !important; }
         }
     </style>
 </head>
